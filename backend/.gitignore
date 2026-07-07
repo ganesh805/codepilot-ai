@@ -1,0 +1,37 @@
+# IntelliJ
+.idea/
+*.iml
+
+# Java
+target/
+*.class
+*.jar
+
+# Maven
+.mvn/timing.properties
+
+# Node
+node_modules/
+dist/
+.angular/
+
+# Environment
+.env
+.env.*
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/
+
+# Docker local data
+docker/data/
+
+# Secrets
+application-local.yml

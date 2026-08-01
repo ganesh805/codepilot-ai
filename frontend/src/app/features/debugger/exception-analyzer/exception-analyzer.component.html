@@ -1,0 +1,94 @@
+<div class="debugger-container">
+  <div class="debugger-header">
+    <h1>🐛 Exception Analyzer & Stack Trace Debugger</h1>
+    <p class="subtitle">Paste raw Java, Node.js, or Python stack traces for automated root cause analysis & code fix recommendations.</p>
+  </div>
+
+  <div class="debug-grid">
+    <!-- Left Input Panel -->
+    <div class="input-panel">
+      <div class="card-box">
+        <h3>Paste Stack Trace Log</h3>
+        
+        <div class="preset-bar">
+          <span class="preset-label">Sample Exception Logs:</span>
+          <div class="preset-chips">
+            <button 
+              type="button" 
+              *ngFor="let sample of sampleTraces" 
+              class="preset-chip" 
+              (click)="loadPreset(sample.trace)">
+              🐞 {{ sample.label }}
+            </button>
+          </div>
+        </div>
+
+        <textarea 
+          class="custom-textarea mono" 
+          rows="12" 
+          [(ngModel)]="stackTraceInput" 
+          placeholder="Paste raw stack trace error log here (e.g. java.lang.NullPointerException at com.codepilot...)"
+        ></textarea>
+
+        <button class="btn-primary btn-analyze" (click)="analyzeTrace()" [disabled]="loading">
+          <mat-spinner diameter="20" *ngIf="loading"></mat-spinner>
+          <span *ngIf="!loading">⚡ Analyze Stack Trace & Generate Fix</span>
+        </button>
+      </div>
+
+      <!-- History List -->
+      <div class="card-box history-box" *ngIf="history.length > 0">
+        <h3>Recent Debugging History</h3>
+        <div class="history-list">
+          <div *ngFor="let item of history" class="history-item" (click)="analysisResult = item">
+            <div class="item-title">
+              <span class="badge-err">{{ item.exceptionType }}</span>
+              <span class="item-time mono">{{ item.createdAt | date:'shortTime' }}</span>
+            </div>
+            <p class="item-msg mono">{{ item.errorMessage }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Analysis Result Panel -->
+    <div class="result-panel">
+      <div *ngIf="!analysisResult && !loading" class="empty-result">
+        <span class="empty-icon">🩺</span>
+        <h3>Ready for Exception Analysis</h3>
+        <p>Paste a stack trace log on the left or click a sample preset button to run automated root cause diagnosis.</p>
+      </div>
+
+      <div *ngIf="loading" class="loading-state">
+        <mat-spinner diameter="36"></mat-spinner>
+        <p>Parsing stack frames & diagnosing root cause...</p>
+      </div>
+
+      <div *ngIf="analysisResult && !loading" class="analysis-result-card">
+        <div class="result-header">
+          <span class="badge-type">{{ analysisResult.exceptionType }}</span>
+          <span class="result-date mono">{{ analysisResult.createdAt | date:'medium' }}</span>
+        </div>
+
+        <div class="error-msg-box">
+          <span class="box-label">Exception Message:</span>
+          <p class="msg-text mono">{{ analysisResult.errorMessage }}</p>
+        </div>
+
+        <div class="root-cause-box">
+          <h3>Diagnosis & Root Cause</h3>
+          <div class="markdown-body">
+            <pre><code>{{ analysisResult.rootCause }}</code></pre>
+          </div>
+        </div>
+
+        <div class="fix-box">
+          <h3>Proposed Code Fix Recommendation</h3>
+          <div class="fix-code-wrapper">
+            <pre><code>{{ analysisResult.suggestedFix }}</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,99 @@
+<div class="sql-page-container">
+  <div class="sql-header">
+    <h1>⚡ SQL Query Optimizer & EXPLAIN Plan Analyzer</h1>
+    <p class="subtitle">Paste raw SQL or JPA query strings to analyze execution plan anti-patterns, missing DDL indexes, and optimized query code.</p>
+  </div>
+
+  <div class="sql-grid">
+    <!-- Input Panel -->
+    <div class="input-panel">
+      <div class="card-box">
+        <h3>Raw SQL Query Input</h3>
+
+        <div class="preset-bar">
+          <span class="preset-label">Sample Query Presets:</span>
+          <div class="preset-chips">
+            <button type="button" *ngFor="let sample of sampleQueries" class="preset-chip" (click)="loadPreset(sample.query)">
+              ⚡ {{ sample.label }}
+            </button>
+          </div>
+        </div>
+
+        <textarea 
+          class="custom-textarea mono" 
+          rows="10" 
+          [(ngModel)]="sqlInput" 
+          placeholder="Paste raw SQL query (e.g. SELECT * FROM users WHERE email LIKE '%gmail.com')..."
+        ></textarea>
+
+        <button class="btn-primary btn-analyze" (click)="optimize()" [disabled]="loading">
+          <mat-spinner diameter="20" *ngIf="loading"></mat-spinner>
+          <span *ngIf="!loading">⚡ Analyze EXPLAIN Plan & Generate Optimized SQL</span>
+        </button>
+      </div>
+
+      <!-- History -->
+      <div class="card-box history-box" *ngIf="history.length > 0">
+        <h3>Optimization History</h3>
+        <div class="history-list">
+          <div *ngFor="let item of history" class="history-item" (click)="optimizationResult = item">
+            <div class="item-title">
+              <span class="sql-preview mono">{{ item.rawSql }}</span>
+              <span class="gain-badge">+{{ item.performanceGainPct }}% Gain</span>
+            </div>
+            <div class="item-meta mono">
+              <span>Analyzed: {{ item.createdAt | date:'shortTime' }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results Panel -->
+    <div class="result-panel">
+      <div *ngIf="!optimizationResult && !loading" class="empty-result">
+        <span class="empty-icon">⚡</span>
+        <h3>Ready for SQL Optimization</h3>
+        <p>Paste a raw SQL query on the left to analyze execution plan anti-patterns & DDL index recommendations.</p>
+      </div>
+
+      <div *ngIf="loading" class="loading-state">
+        <mat-spinner diameter="36"></mat-spinner>
+        <p>Analyzing SQL EXPLAIN execution plan & indexing strategies...</p>
+      </div>
+
+      <div *ngIf="optimizationResult && !loading" class="analysis-result-card">
+        <div class="result-top">
+          <span class="gain-banner">🚀 Estimated Performance Gain: +{{ optimizationResult.performanceGainPct }}% Faster Execution</span>
+          <span class="date mono">{{ optimizationResult.createdAt | date:'medium' }}</span>
+        </div>
+
+        <!-- Detected Anti-Patterns -->
+        <div *ngIf="optimizationResult.detectedAntiPatterns && optimizationResult.detectedAntiPatterns.length > 0" class="anti-pattern-box">
+          <h3>Detected Query Anti-Patterns ({{ optimizationResult.detectedAntiPatterns.length }})</h3>
+          <div class="anti-pattern-list">
+            <div *ngFor="let pattern of optimizationResult.detectedAntiPatterns" class="anti-pattern-item">
+              {{ pattern }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Optimized SQL Output -->
+        <div class="opt-code-box">
+          <h3>Optimized SQL Query</h3>
+          <div class="code-wrapper">
+            <pre><code>{{ optimizationResult.optimizedSql }}</code></pre>
+          </div>
+        </div>
+
+        <!-- Recommended Index DDL -->
+        <div class="ddl-code-box">
+          <h3>Recommended Database DDL Indexing Statements</h3>
+          <div class="code-wrapper ddl-wrapper">
+            <pre><code>{{ optimizationResult.indexingDdl }}</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

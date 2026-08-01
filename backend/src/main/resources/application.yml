@@ -1,40 +1,10 @@
 spring:
+  profiles:
+    active: h2
   application:
     name: codepilot-backend
 
-  datasource:
-    url: jdbc:mysql://localhost:3307/codepilot
-    username: codepilot
-    password: codepilot_dev
-    driver-class-name: com.mysql.cj.jdbc.Driver
-
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    open-in-view: false
-    properties:
-      hibernate:
-        format_sql: true
-
-  data:
-    redis:
-      host: localhost
-      port: 6380
-
 server:
   port: 8080
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics,prometheus
-
-  endpoint:
-    health:
-      show-details: always
-
-logging:
-  level:
-    root: INFO
-    com.codepilot: DEBUG
+  servlet:
+    context-path: /api/v1

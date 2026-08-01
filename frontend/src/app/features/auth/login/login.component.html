@@ -1,0 +1,40 @@
+<div class="auth-container">
+  <div class="auth-card">
+    <div class="auth-header">
+      <h2>Sign in to CodePilot AI</h2>
+      <p>Enter your credentials to access your workspace</p>
+    </div>
+
+    <div *ngIf="errorMessage" class="error-banner">
+      {{ errorMessage }}
+    </div>
+
+    <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="auth-form">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Username or Email</mat-label>
+        <input matInput formControlName="usernameOrEmail" placeholder="e.g. dev_user or dev@company.com">
+        <mat-error *ngIf="loginForm.get('usernameOrEmail')?.hasError('required')">
+          Username or Email is required
+        </mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Password</mat-label>
+        <input matInput type="password" formControlName="password" placeholder="••••••••">
+        <mat-error *ngIf="loginForm.get('password')?.hasError('required')">
+          Password is required
+        </mat-error>
+      </mat-form-field>
+
+      <button mat-flat-button color="primary" class="full-width submit-btn" [disabled]="loginForm.invalid || loading">
+        <mat-spinner diameter="20" *ngIf="loading"></mat-spinner>
+        <span *ngIf="!loading">Sign In</span>
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      <span>Don't have an account?</span>
+      <a routerLink="/register" class="link">Create an account</a>
+    </div>
+  </div>
+</div>

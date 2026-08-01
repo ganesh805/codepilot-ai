@@ -1,0 +1,53 @@
+<div class="repos-container">
+  <div class="repos-header">
+    <div>
+      <h1>Code Repositories</h1>
+      <p>Manage imported codebases and repositories for AI analysis.</p>
+    </div>
+    <button mat-flat-button color="primary" routerLink="/repositories/import">
+      <mat-icon>add</mat-icon> Import Repository
+    </button>
+  </div>
+
+  <div *ngIf="loading" class="loading-state">
+    <mat-spinner diameter="36"></mat-spinner>
+    <p>Loading code repositories...</p>
+  </div>
+
+  <div *ngIf="!loading && repositories.length === 0" class="empty-state">
+    <mat-icon class="empty-icon">folder_open</mat-icon>
+    <h3>No Repositories Imported Yet</h3>
+    <p>Import your first GitHub repository or ZIP project archive to enable AI code assistant analysis.</p>
+    <button mat-flat-button color="primary" routerLink="/repositories/import">Import Repository</button>
+  </div>
+
+  <div *ngIf="!loading && repositories.length > 0" class="repo-grid">
+    <mat-card *ngFor="let repo of repositories" class="repo-card">
+      <div class="card-header">
+        <div class="repo-title">
+          <mat-icon>{{ repo.importType === 'GITHUB' ? 'code' : 'folder_zip' }}</mat-icon>
+          <span class="name">{{ repo.name }}</span>
+        </div>
+        <span class="status-badge" [class.ready]="repo.status === 'READY'" [class.failed]="repo.status === 'FAILED'">
+          {{ repo.status }}
+        </span>
+      </div>
+
+      <div class="card-body">
+        <p *ngIf="repo.gitUrl" class="git-url mono">{{ repo.gitUrl }}</p>
+        <div class="meta-row">
+          <span class="meta-item"><mat-icon>description</mat-icon> {{ repo.fileCount }} files</span>
+          <span class="meta-item"><mat-icon>storage</mat-icon> {{ formatSize(repo.totalSizeBytes) }}</span>
+          <span class="meta-item"><mat-icon>alt_route</mat-icon> {{ repo.defaultBranch }}</span>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <span class="owner-chip">{{ repo.owner }}</span>
+        <button mat-icon-button color="warn" (click)="deleteRepo(repo)" title="Delete Repository">
+          <mat-icon>delete_outline</mat-icon>
+        </button>
+      </div>
+    </mat-card>
+  </div>
+</div>

@@ -1,0 +1,81 @@
+.import-container {
+  max-width: 720px;
+  margin: 40px auto;
+  padding: 0 20px;
+
+  .import-header {
+    margin-bottom: 24px;
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin: 0 0 8px 0;
+    }
+    p {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+  }
+
+  .import-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 24px;
+
+    .tab-form {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding-top: 24px;
+
+      .full-width {
+        width: 100%;
+      }
+
+      .submit-btn {
+        height: 44px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        background: var(--accent-color);
+        color: #0f172a;
+
+        &:hover {
+          background: var(--accent-hover);
+        }
+      }
+    }
+
+    .file-drop-zone {
+      border: 2px dashed var(--border-color);
+      border-radius: 8px;
+      padding: 32px;
+      text-align: center;
+      background: rgba(15, 23, 42, 0.4);
+
+      .upload-icon {
+        font-size: 48px;
+        width: 48px;
+        height: 48px;
+        color: var(--accent-color);
+        margin-bottom: 12px;
+      }
+
+      h3 {
+        margin: 0 0 4px 0;
+        font-size: 1.1rem;
+      }
+
+      p {
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+        margin-bottom: 16px;
+      }
+
+      .file-name {
+        margin-top: 12px;
+        color: var(--accent-color);
+        font-size: 0.85rem;
+      }
+    }
+  }
+}

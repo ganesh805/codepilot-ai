@@ -1,0 +1,56 @@
+<div class="import-container">
+  <div class="import-header">
+    <h1>Import Code Repository</h1>
+    <p>Connect a public GitHub repository or upload a local project ZIP archive.</p>
+  </div>
+
+  <mat-card class="import-card">
+    <mat-tab-group animationDuration="200ms">
+      <!-- GitHub Tab -->
+      <mat-tab label="GitHub Repository">
+        <form [formGroup]="githubForm" (ngSubmit)="onGithubSubmit()" class="tab-form">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>GitHub Repository URL</mat-label>
+            <input matInput formControlName="gitUrl" placeholder="https://github.com/spring-projects/spring-petclinic.git">
+            <mat-icon matPrefix>link</mat-icon>
+            <mat-error *ngIf="githubForm.get('gitUrl')?.hasError('required')">GitHub URL is required</mat-error>
+            <mat-error *ngIf="githubForm.get('gitUrl')?.hasError('pattern')">Enter a valid HTTP/HTTPS URL</mat-error>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Target Branch</mat-label>
+            <input matInput formControlName="branch" placeholder="main or master">
+          </mat-form-field>
+
+          <button mat-flat-button color="primary" class="submit-btn" [disabled]="githubForm.invalid || loading">
+            <mat-spinner diameter="20" *ngIf="loading"></mat-spinner>
+            <span *ngIf="!loading">Clone & Process Repository</span>
+          </button>
+        </form>
+      </mat-tab>
+
+      <!-- ZIP Upload Tab -->
+      <mat-tab label="ZIP Archive Upload">
+        <div class="tab-form">
+          <div class="file-drop-zone">
+            <mat-icon class="upload-icon">cloud_upload</mat-icon>
+            <h3>Select a Project ZIP File</h3>
+            <p>Upload source code zip archive (max 50MB)</p>
+
+            <input type="file" #fileInput (change)="onFileSelected($event)" accept=".zip" style="display: none;">
+            <button mat-stroked-button color="primary" (click)="fileInput.click()">Choose ZIP File</button>
+
+            <div *ngIf="selectedZipFile" class="file-name mono">
+              Selected: {{ selectedZipFile.name }} ({{ (selectedZipFile.size / 1024 / 1024).toFixed(2) }} MB)
+            </div>
+          </div>
+
+          <button mat-flat-button color="primary" class="submit-btn" [disabled]="!selectedZipFile || loading" (click)="onZipSubmit()">
+            <mat-spinner diameter="20" *ngIf="loading"></mat-spinner>
+            <span *ngIf="!loading">Extract & Import ZIP</span>
+          </button>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  </mat-card>
+</div>

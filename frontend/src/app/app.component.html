@@ -1,0 +1,32 @@
+<div class="app-container">
+  <header class="app-header">
+    <div class="brand" routerLink="/repositories">
+      <span class="logo-icon">⚡</span>
+      <span class="brand-name">CodePilot <span class="badge">AI</span></span>
+    </div>
+
+    <div class="auth-actions">
+      <ng-container *ngIf="authService.isAuthenticated(); else unauthenticated">
+        <button mat-button routerLink="/repositories">
+          <mat-icon>folder_special</mat-icon> Repositories
+        </button>
+        <button mat-button color="accent" routerLink="/admin" *ngIf="authService.isAdmin()">
+          <mat-icon>admin_panel_settings</mat-icon> Admin Panel
+        </button>
+        <div class="user-chip">
+          <span class="user-name">{{ authService.currentUser()?.firstName }} {{ authService.currentUser()?.lastName }}</span>
+          <span class="user-email mono">({{ authService.currentUser()?.username }})</span>
+        </div>
+        <button mat-button color="warn" (click)="logout()">Sign Out</button>
+      </ng-container>
+      <ng-template #unauthenticated>
+        <button mat-button routerLink="/login">Sign In</button>
+        <button mat-flat-button color="primary" routerLink="/register">Register</button>
+      </ng-template>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <router-outlet></router-outlet>
+  </main>
+</div>

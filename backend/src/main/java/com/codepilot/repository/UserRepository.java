@@ -2,12 +2,22 @@ package com.codepilot.repository;
 
 import com.codepilot.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
+@Repository
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    Optional<User> findByEmailIgnoreCase(String email);
+    Optional<User> findByUsername(String username);
 
-    boolean existsByEmailIgnoreCase(String email);
+    Optional<User> findByEmail(String email);
+
+    Optional<User> findByUsernameOrEmail(String username, String email);
+
+    Optional<User> findByUuid(String uuid);
+
+    boolean existsByUsername(String username);
+
+    boolean existsByEmail(String email);
 }

@@ -1,0 +1,26 @@
+# IDE & Editors
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Backend build outputs
+backend/target/
+backend/out/
+backend/*.log
+
+# Frontend build & dependency outputs
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+frontend/coverage/
+
+# Local Storage & Database files
+storage/
+*.db
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db

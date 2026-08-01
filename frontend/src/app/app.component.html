@@ -7,11 +7,11 @@
 
     <div class="auth-actions">
       <ng-container *ngIf="authService.isAuthenticated(); else unauthenticated">
-        <button mat-button routerLink="/repositories">
-          <mat-icon>folder_special</mat-icon> Repositories
+        <button mat-button routerLink="/repositories" class="nav-btn">
+          📂 Repositories
         </button>
-        <button mat-button color="accent" routerLink="/admin" *ngIf="authService.isAdmin()">
-          <mat-icon>admin_panel_settings</mat-icon> Admin Panel
+        <button mat-button color="accent" routerLink="/admin" *ngIf="authService.isAdmin()" class="nav-btn">
+          🛡️ Admin Panel
         </button>
         <div class="user-chip">
           <span class="user-name">{{ authService.currentUser()?.firstName }} {{ authService.currentUser()?.lastName }}</span>

@@ -7,19 +7,21 @@ import com.codepilot.entity.ImportType;
 import com.codepilot.entity.RepositoryStatus;
 import com.codepilot.entity.User;
 import com.codepilot.repository.CodeRepositoryRepository;
+import org.eclipse.jgit.api.CloneCommand;
 import org.eclipse.jgit.api.Git;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.FileSystemUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.*;
 import java.util.List;
 import java.util.UUID;
@@ -59,34 +61,71 @@ public class RepositoryImportService {
                 .gitUrl(request.getGitUrl())
                 .importType(ImportType.GITHUB)
                 .storagePath(targetDir.toAbsolutePath().toString())
-                .defaultBranch(request.getBranch() != null ? request.getBranch() : "main")
+                .defaultBranch(request.getBranch() != null && !request.getBranch().trim().isEmpty() ? request.getBranch() : "main")
                 .status(RepositoryStatus.CLONING)
                 .build();
 
         CodeRepository savedRepo = repoRepository.save(repository);
 
+        // Execute asynchronous cloning in worker thread
+        cloneRepositoryAsync(savedRepo.getId(), request.getGitUrl(), request.getBranch(), targetDir);
+
+        return mapToResponse(savedRepo);
+    }
+
+    @Async
+    public void cloneRepositoryAsync(Long repoId, String gitUrl, String requestedBranch, Path targetDir) {
+        CodeRepository repo = repoRepository.findById(repoId).orElse(null);
+        if (repo == null) return;
+
         try {
-            log.info("Cloning GitHub repository {} to {}", request.getGitUrl(), targetDir);
+            log.info("Starting Async GitHub clone for {} to {}", gitUrl, targetDir);
             Files.createDirectories(targetDir);
 
-            Git.cloneRepository()
-                    .setURI(request.getGitUrl())
-                    .setDirectory(targetDir.toFile())
-                    .setBranch(request.getBranch())
-                    .call();
+            boolean cloneSuccess = false;
+            // Attempt 1: Specific requested branch if provided
+            if (requestedBranch != null && !requestedBranch.trim().isEmpty()) {
+                try {
+                    CloneCommand cloneCmd = Git.cloneRepository()
+                            .setURI(gitUrl)
+                            .setDirectory(targetDir.toFile())
+                            .setBranch(requestedBranch.trim());
+                    try (Git git = cloneCmd.call()) {
+                        repo.setDefaultBranch(git.getRepository().getBranch());
+                        cloneSuccess = true;
+                    }
+                } catch (Exception ex) {
+                    log.warn("Requested branch clone failed. Falling back to default branch discovery...");
+                    FileSystemUtils.deleteRecursively(targetDir);
+                    Files.createDirectories(targetDir);
+                }
+            }
+
+            // Attempt 2: Auto default branch discovery
+            if (!cloneSuccess) {
+                CloneCommand cloneCmd = Git.cloneRepository()
+                        .setURI(gitUrl)
+                        .setDirectory(targetDir.toFile());
+                try (Git git = cloneCmd.call()) {
+                    String discoveredBranch = git.getRepository().getBranch();
+                    if (discoveredBranch != null) {
+                        repo.setDefaultBranch(discoveredBranch);
+                    }
+                }
+            }
 
             long[] stats = calculateDirectoryStats(targetDir);
-            savedRepo.setFileCount((int) stats[0]);
-            savedRepo.setTotalSizeBytes(stats[1]);
-            savedRepo.setStatus(RepositoryStatus.READY);
+            repo.setFileCount((int) stats[0]);
+            repo.setTotalSizeBytes(stats[1]);
+            repo.setStatus(RepositoryStatus.READY);
+            log.info("Async clone complete for {}. Files: {}, Bytes: {}", repo.getName(), stats[0], stats[1]);
 
         } catch (Exception ex) {
-            log.error("Failed to clone GitHub repository", ex);
-            savedRepo.setStatus(RepositoryStatus.FAILED);
-            throw new RuntimeException("Failed to clone GitHub repository: " + ex.getMessage(), ex);
+            log.error("Async clone failed for repository {}", repo.getName(), ex);
+            repo.setStatus(RepositoryStatus.FAILED);
+        } finally {
+            repoRepository.save(repo);
         }
-
-        return mapToResponse(repoRepository.save(savedRepo));
     }
 
     @Transactional
@@ -127,7 +166,6 @@ public class RepositoryImportService {
         } catch (Exception ex) {
             log.error("Failed to extract ZIP repository", ex);
             savedRepo.setStatus(RepositoryStatus.FAILED);
-            throw new RuntimeException("Failed to extract ZIP upload: " + ex.getMessage(), ex);
         }
 
         return mapToResponse(repoRepository.save(savedRepo));
@@ -162,7 +200,7 @@ public class RepositoryImportService {
         repoRepository.delete(repo);
     }
 
-    private void unzipSafely(java.io.InputStream inputStream, Path targetDir) throws IOException {
+    private void unzipSafely(InputStream inputStream, Path targetDir) throws IOException {
         try (ZipInputStream zis = new ZipInputStream(inputStream)) {
             ZipEntry zipEntry = zis.getNextEntry();
             byte[] buffer = new byte[8192];

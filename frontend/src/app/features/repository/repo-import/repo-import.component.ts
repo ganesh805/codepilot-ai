@@ -9,7 +9,6 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { MatIconModule } from '@angular/material/icon';
 import { RepositoryService } from '../../../core/services/repository.service';
 
 @Component({
@@ -24,8 +23,7 @@ import { RepositoryService } from '../../../core/services/repository.service';
     MatButtonModule,
     MatFormFieldModule,
     MatProgressSpinnerModule,
-    MatSnackBarModule,
-    MatIconModule
+    MatSnackBarModule
   ],
   templateUrl: './repo-import.component.html',
   styleUrls: ['./repo-import.component.scss']
@@ -38,11 +36,18 @@ export class RepoImportComponent {
 
   githubForm: FormGroup = this.fb.group({
     gitUrl: ['', [Validators.required, Validators.pattern('https?://.*')]],
-    branch: ['main']
+    branch: ['']
   });
 
   selectedZipFile: File | null = null;
   loading = false;
+
+  fillSampleUrl(url: string): void {
+    this.githubForm.patchValue({
+      gitUrl: url,
+      branch: ''
+    });
+  }
 
   onGithubSubmit(): void {
     if (this.githubForm.invalid) return;
@@ -56,7 +61,8 @@ export class RepoImportComponent {
       },
       error: (err) => {
         this.loading = false;
-        this.snackBar.open('GitHub import failed. Ensure public repository URL is valid.', 'Close', { duration: 4000 });
+        const msg = err.error?.message || 'GitHub import failed. Ensure repository URL is valid and public.';
+        this.snackBar.open(msg, 'Close', { duration: 5000 });
       }
     });
   }
@@ -80,7 +86,8 @@ export class RepoImportComponent {
       },
       error: (err) => {
         this.loading = false;
-        this.snackBar.open('ZIP extraction failed. Ensure file is a valid .zip archive.', 'Close', { duration: 4000 });
+        const msg = err.error?.message || 'ZIP extraction failed. Ensure file is a valid .zip archive.';
+        this.snackBar.open(msg, 'Close', { duration: 5000 });
       }
     });
   }

@@ -12,10 +12,21 @@
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>GitHub Repository URL</mat-label>
             <input matInput formControlName="gitUrl" placeholder="https://github.com/spring-projects/spring-petclinic.git">
-            <mat-icon matPrefix>link</mat-icon>
             <mat-error *ngIf="githubForm.get('gitUrl')?.hasError('required')">GitHub URL is required</mat-error>
             <mat-error *ngIf="githubForm.get('gitUrl')?.hasError('pattern')">Enter a valid HTTP/HTTPS URL</mat-error>
           </mat-form-field>
+
+          <div class="samples-box">
+            <span class="sample-label">Try a sample public repository:</span>
+            <div class="sample-buttons">
+              <button type="button" class="sample-chip" (click)="fillSampleUrl('https://github.com/spring-projects/spring-petclinic.git')">
+                🌱 spring-petclinic (Java)
+              </button>
+              <button type="button" class="sample-chip" (click)="fillSampleUrl('https://github.com/expressjs/express.git')">
+                ⚡ express (Node.js)
+              </button>
+            </div>
+          </div>
 
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>Target Branch</mat-label>
@@ -33,9 +44,9 @@
       <mat-tab label="ZIP Archive Upload">
         <div class="tab-form">
           <div class="file-drop-zone">
-            <mat-icon class="upload-icon">cloud_upload</mat-icon>
+            <span class="drop-icon">📁</span>
             <h3>Select a Project ZIP File</h3>
-            <p>Upload source code zip archive (max 50MB)</p>
+            <p>Upload a local source code .zip archive</p>
 
             <input type="file" #fileInput (change)="onFileSelected($event)" accept=".zip" style="display: none;">
             <button mat-stroked-button color="primary" (click)="fileInput.click()">Choose ZIP File</button>

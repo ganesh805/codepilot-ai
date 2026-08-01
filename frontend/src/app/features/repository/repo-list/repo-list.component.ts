@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
@@ -9,6 +9,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { CodeRepository } from '../../../core/models/repository.model';
 import { RepositoryService } from '../../../core/services/repository.service';
+import { Subscription, interval } from 'rxjs';
 
 @Component({
   selector: 'app-repo-list',
@@ -26,27 +27,37 @@ import { RepositoryService } from '../../../core/services/repository.service';
   templateUrl: './repo-list.component.html',
   styleUrls: ['./repo-list.component.scss']
 })
-export class RepoListComponent implements OnInit {
+export class RepoListComponent implements OnInit, OnDestroy {
   private repoService = inject(RepositoryService);
   private snackBar = inject(MatSnackBar);
+  private pollSub?: Subscription;
 
   repositories: CodeRepository[] = [];
   loading = true;
 
   ngOnInit(): void {
-    this.loadRepositories();
+    this.loadRepositories(true);
+    // Poll status every 3 seconds for repos in CLONING / EXTRACTING state
+    this.pollSub = interval(3000).subscribe(() => {
+      if (this.repositories.some(r => r.status === 'CLONING' || r.status === 'EXTRACTING')) {
+        this.loadRepositories(false);
+      }
+    });
   }
 
-  loadRepositories(): void {
-    this.loading = true;
+  ngOnDestroy(): void {
+    this.pollSub?.unsubscribe();
+  }
+
+  loadRepositories(showSpinner = false): void {
+    if (showSpinner) this.loading = true;
     this.repoService.getRepositories().subscribe({
       next: (data) => {
         this.repositories = data;
         this.loading = false;
       },
-      error: (err) => {
+      error: () => {
         this.loading = false;
-        this.snackBar.open('Failed to load repositories', 'Close', { duration: 3000 });
       }
     });
   }
@@ -56,7 +67,7 @@ export class RepoListComponent implements OnInit {
       this.repoService.deleteRepository(repo.uuid).subscribe({
         next: () => {
           this.snackBar.open(`Repository '${repo.name}' deleted`, 'Close', { duration: 3000 });
-          this.loadRepositories();
+          this.loadRepositories(false);
         },
         error: () => {
           this.snackBar.open('Failed to delete repository', 'Close', { duration: 3000 });
@@ -66,7 +77,7 @@ export class RepoListComponent implements OnInit {
   }
 
   formatSize(bytes: number): string {
-    if (bytes === 0) return '0 B';
+    if (!bytes || bytes === 0) return '0 B';
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));

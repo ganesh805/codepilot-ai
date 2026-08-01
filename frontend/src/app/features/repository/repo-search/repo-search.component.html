@@ -1,0 +1,79 @@
+<div class="search-container">
+  <div class="search-header">
+    <a [routerLink]="['/repositories', repoUuid, 'scan']" class="back-link">← Back to Code Chunks</a>
+    <h1>AI Semantic RAG Code Search</h1>
+    <p class="subtitle">Search your codebase in natural language using 768-D vector Cosine distance matching.</p>
+  </div>
+
+  <!-- Search Input Bar -->
+  <div class="search-card">
+    <div class="search-input-wrapper">
+      <span class="search-icon">🔍</span>
+      <input 
+        type="text" 
+        class="custom-search-input" 
+        [(ngModel)]="searchQuery" 
+        (keyup.enter)="executeSearch()"
+        placeholder="Ask in natural language e.g. Where do we validate JWT tokens or hash passwords?"
+      />
+      <button class="btn-primary" (click)="executeSearch()" [disabled]="loading">
+        <mat-spinner diameter="18" *ngIf="loading"></mat-spinner>
+        <span *ngIf="!loading">Search Codebase</span>
+      </button>
+    </div>
+
+    <div class="samples-box">
+      <span class="sample-label">Try a sample natural language query:</span>
+      <div class="sample-chips">
+        <button 
+          type="button"
+          *ngFor="let query of sampleQueries" 
+          class="sample-chip" 
+          (click)="fillSampleQuery(query)">
+          💬 {{ query }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="loading" class="loading-state">
+    <mat-spinner diameter="36"></mat-spinner>
+    <p>Computing vector similarity across codebase chunks...</p>
+  </div>
+
+  <div *ngIf="!loading && hasSearched && results.length === 0" class="empty-state">
+    <span class="empty-icon">🔍</span>
+    <h3>No Semantic Code Matches Found</h3>
+    <p>Try rephrasing your search query or run the AST Scanner and Vector Embedding Generator first.</p>
+  </div>
+
+  <!-- Results List -->
+  <div *ngIf="!loading && results.length > 0" class="results-section">
+    <div class="results-header">
+      <h2>Top {{ results.length }} Relevant Code Matches</h2>
+    </div>
+
+    <div class="results-list">
+      <div *ngFor="let match of results; let i = index" class="result-card">
+        <div class="card-top">
+          <div class="meta-left">
+            <span class="rank-badge">#{{ i + 1 }}</span>
+            <span class="file-path mono">{{ match.filePath }}</span>
+            <span class="lang-badge">{{ match.language }}</span>
+          </div>
+          <div class="score-badge" [class.high-score]="match.similarityScore >= 0.7">
+            {{ getScorePercentage(match.similarityScore) }}% Similarity Match
+          </div>
+        </div>
+
+        <div class="card-info mono">
+          Lines {{ match.startLine }} - {{ match.endLine }} ({{ match.tokenCount }} tokens)
+        </div>
+
+        <div class="card-code">
+          <pre><code>{{ match.content }}</code></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

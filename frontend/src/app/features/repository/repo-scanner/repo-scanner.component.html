@@ -11,7 +11,10 @@
         <span *ngIf="!scanning">🧠 Re-Scan & Generate Chunks</span>
       </button>
       <button class="btn-secondary" [routerLink]="['/repositories', repoUuid, 'embedding']">
-        ⚡ Vector Embeddings & Qdrant
+        ⚡ Vector Store
+      </button>
+      <button class="btn-secondary accent-glow" [routerLink]="['/repositories', repoUuid, 'search']">
+        🔍 AI Semantic Search
       </button>
     </div>
   </div>

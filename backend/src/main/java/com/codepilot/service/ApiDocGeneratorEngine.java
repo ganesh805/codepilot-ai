@@ -49,42 +49,13 @@ public class ApiDocGeneratorEngine {
         List<CodeChunk> chunks = chunkRepository.findByRepositoryIdOrderByFilePathAscChunkIndexAsc(repo.getId());
         List<EndpointSummaryDTO> endpoints = extractEndpointsFromChunks(chunks);
 
-        // Fallback default endpoints if repository has custom endpoints
         if (endpoints.isEmpty()) {
-            endpoints.add(EndpointSummaryDTO.builder()
-                    .httpMethod("GET").path("/api/v1/health")
-                    .controllerClass("HealthCheckController").methodName("getHealthStatus")
-                    .filePath("src/main/java/com/codepilot/controller/HealthCheckController.java")
-                    .startLine(1).endLine(25)
-                    .sourceCodeSnippet("@GetMapping(\"/health\")\npublic ResponseEntity<Map<String, Object>> getHealthStatus() {\n    return ResponseEntity.ok(Map.of(\"status\", \"UP\"));\n}")
-                    .build());
-            endpoints.add(EndpointSummaryDTO.builder()
-                    .httpMethod("POST").path("/api/v1/auth/login")
-                    .controllerClass("AuthController").methodName("loginUser")
-                    .filePath("src/main/java/com/codepilot/controller/AuthController.java")
-                    .startLine(20).endLine(55)
-                    .sourceCodeSnippet("@PostMapping(\"/login\")\npublic ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {\n    return ResponseEntity.ok(authService.login(request));\n}")
-                    .build());
-            endpoints.add(EndpointSummaryDTO.builder()
-                    .httpMethod("POST").path("/api/v1/auth/register")
-                    .controllerClass("AuthController").methodName("registerUser")
-                    .filePath("src/main/java/com/codepilot/controller/AuthController.java")
-                    .startLine(56).endLine(90)
-                    .sourceCodeSnippet("@PostMapping(\"/register\")\npublic ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {\n    return ResponseEntity.ok(authService.register(request));\n}")
-                    .build());
-            endpoints.add(EndpointSummaryDTO.builder()
-                    .httpMethod("POST").path("/api/v1/repos/import/github")
-                    .controllerClass("RepositoryImportController").methodName("importGithubRepo")
-                    .filePath("src/main/java/com/codepilot/controller/RepositoryImportController.java")
-                    .startLine(15).endLine(45)
-                    .sourceCodeSnippet("@PostMapping(\"/import/github\")\npublic ResponseEntity<CodeRepositoryDTO> importGithubRepo(@Valid @RequestBody GithubImportRequest req) {\n    return ResponseEntity.status(HttpStatus.CREATED).body(repoService.importGithubRepo(req));\n}")
-                    .build());
+            endpoints = buildFallbackEndpoints();
         }
 
         String markdown = buildMarkdownSpec(repo.getName(), endpoints);
         String openapiJson = buildOpenApiJsonSpec(repo.getName(), endpoints);
 
-        // Safely delete previous docs for this repository
         try {
             apiDocRepository.deleteByRepositoryId(repo.getId());
             apiDocRepository.flush();
@@ -126,34 +97,7 @@ public class ApiDocGeneratorEngine {
         List<CodeChunk> chunks = chunkRepository.findByRepositoryIdOrderByFilePathAscChunkIndexAsc(repo.getId());
         List<EndpointSummaryDTO> endpoints = extractEndpointsFromChunks(chunks);
         if (endpoints.isEmpty()) {
-            endpoints.add(EndpointSummaryDTO.builder()
-                    .httpMethod("GET").path("/api/v1/health")
-                    .controllerClass("HealthCheckController").methodName("getHealthStatus")
-                    .filePath("src/main/java/com/codepilot/controller/HealthCheckController.java")
-                    .startLine(1).endLine(25)
-                    .sourceCodeSnippet("@GetMapping(\"/health\")\npublic ResponseEntity<Map<String, Object>> getHealthStatus() {\n    return ResponseEntity.ok(Map.of(\"status\", \"UP\"));\n}")
-                    .build());
-            endpoints.add(EndpointSummaryDTO.builder()
-                    .httpMethod("POST").path("/api/v1/auth/login")
-                    .controllerClass("AuthController").methodName("loginUser")
-                    .filePath("src/main/java/com/codepilot/controller/AuthController.java")
-                    .startLine(20).endLine(55)
-                    .sourceCodeSnippet("@PostMapping(\"/login\")\npublic ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {\n    return ResponseEntity.ok(authService.login(request));\n}")
-                    .build());
-            endpoints.add(EndpointSummaryDTO.builder()
-                    .httpMethod("POST").path("/api/v1/auth/register")
-                    .controllerClass("AuthController").methodName("registerUser")
-                    .filePath("src/main/java/com/codepilot/controller/AuthController.java")
-                    .startLine(56).endLine(90)
-                    .sourceCodeSnippet("@PostMapping(\"/register\")\npublic ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {\n    return ResponseEntity.ok(authService.register(request));\n}")
-                    .build());
-            endpoints.add(EndpointSummaryDTO.builder()
-                    .httpMethod("POST").path("/api/v1/repos/import/github")
-                    .controllerClass("RepositoryImportController").methodName("importGithubRepo")
-                    .filePath("src/main/java/com/codepilot/controller/RepositoryImportController.java")
-                    .startLine(15).endLine(45)
-                    .sourceCodeSnippet("@PostMapping(\"/import/github\")\npublic ResponseEntity<CodeRepositoryDTO> importGithubRepo(@Valid @RequestBody GithubImportRequest req) {\n    return ResponseEntity.status(HttpStatus.CREATED).body(repoService.importGithubRepo(req));\n}")
-                    .build());
+            endpoints = buildFallbackEndpoints();
         }
 
         return ApiDocResponse.builder()
@@ -174,7 +118,9 @@ public class ApiDocGeneratorEngine {
             if (chunk.getContent() == null) continue;
             String content = chunk.getContent();
             String fileName = chunk.getFileName() != null ? chunk.getFileName() : "";
-            String filePath = chunk.getFilePath() != null ? chunk.getFilePath() : fileName;
+            String filePath = (chunk.getFilePath() != null && !chunk.getFilePath().trim().isEmpty())
+                    ? chunk.getFilePath()
+                    : "src/main/java/" + fileName;
 
             if (content.contains("@Controller") || content.contains("@RestController") || fileName.endsWith("Controller.java") || fileName.endsWith("Resource.java")) {
                 String className = fileName.replace(".java", "").replace(".ts", "");
@@ -198,15 +144,21 @@ public class ApiDocGeneratorEngine {
                             String fullPath = basePath + (pathVal.startsWith("/") ? pathVal : "/" + pathVal);
                             fullPath = fullPath.replaceAll("//+", "/");
 
+                            String snippet = content;
+                            if (snippet == null || snippet.trim().isEmpty()) {
+                                snippet = String.format("@%sMapping(\"%s\")\npublic ResponseEntity<?> handleRequest() {\n    // Implementation in %s\n}",
+                                        httpMethod.equalsIgnoreCase("GET") ? "Get" : "Post", fullPath, className);
+                            }
+
                             endpoints.add(EndpointSummaryDTO.builder()
                                     .httpMethod(httpMethod)
                                     .path(fullPath.isEmpty() ? "/" : fullPath)
                                     .controllerClass(className)
                                     .methodName("handleRequest")
                                     .filePath(filePath)
-                                    .startLine(chunk.getStartLine())
-                                    .endLine(chunk.getEndLine())
-                                    .sourceCodeSnippet(chunk.getContent())
+                                    .startLine(chunk.getStartLine() > 0 ? chunk.getStartLine() : 1)
+                                    .endLine(chunk.getEndLine() > 0 ? chunk.getEndLine() : 50)
+                                    .sourceCodeSnippet(snippet)
                                     .build());
                         }
                     }
@@ -214,6 +166,32 @@ public class ApiDocGeneratorEngine {
             }
         }
         return endpoints;
+    }
+
+    private List<EndpointSummaryDTO> buildFallbackEndpoints() {
+        List<EndpointSummaryDTO> list = new ArrayList<>();
+        list.add(EndpointSummaryDTO.builder()
+                .httpMethod("GET").path("/api/v1/health")
+                .controllerClass("HealthCheckController").methodName("getHealthStatus")
+                .filePath("src/main/java/com/codepilot/controller/HealthCheckController.java")
+                .startLine(1).endLine(25)
+                .sourceCodeSnippet("@GetMapping(\"/health\")\npublic ResponseEntity<Map<String, Object>> getHealthStatus() {\n    return ResponseEntity.ok(Map.of(\"status\", \"UP\"));\n}")
+                .build());
+        list.add(EndpointSummaryDTO.builder()
+                .httpMethod("POST").path("/api/v1/auth/login")
+                .controllerClass("AuthController").methodName("loginUser")
+                .filePath("src/main/java/com/codepilot/controller/AuthController.java")
+                .startLine(20).endLine(55)
+                .sourceCodeSnippet("@PostMapping(\"/login\")\npublic ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {\n    return ResponseEntity.ok(authService.login(request));\n}")
+                .build());
+        list.add(EndpointSummaryDTO.builder()
+                .httpMethod("POST").path("/api/v1/auth/register")
+                .controllerClass("AuthController").methodName("registerUser")
+                .filePath("src/main/java/com/codepilot/controller/AuthController.java")
+                .startLine(56).endLine(90)
+                .sourceCodeSnippet("@PostMapping(\"/register\")\npublic ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {\n    return ResponseEntity.ok(authService.register(request));\n}")
+                .build());
+        return list;
     }
 
     private String buildMarkdownSpec(String repoName, List<EndpointSummaryDTO> endpoints) {

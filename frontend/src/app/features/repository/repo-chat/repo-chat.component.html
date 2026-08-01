@@ -2,8 +2,23 @@
   <div class="chat-header">
     <div>
       <a [routerLink]="['/repositories', repoUuid, 'scan']" class="back-link">← Back to Repository</a>
-      <h1>🤖 AI CodePilot Assistant (RAG Chat)</h1>
-      <p class="subtitle">Ask questions about codebase architecture, functions, endpoints, or implementation details.</p>
+      <h1>🤖 Multi-Model AI Code Assistant</h1>
+      <p class="subtitle">Switch between Google Gemini 1.5 Pro, OpenAI GPT-4o, DeepSeek, or Hybrid Ensemble for multi-AI answers.</p>
+    </div>
+  </div>
+
+  <!-- AI Model Selector Bar -->
+  <div class="model-selector-bar">
+    <span class="selector-label">Select Active AI Provider Engine:</span>
+    <div class="provider-chips">
+      <button 
+        type="button" 
+        *ngFor="let p of providersList" 
+        class="provider-chip" 
+        [class.active-provider]="selectedProvider === p.id"
+        (click)="selectProvider(p.id)">
+        <span>{{ p.icon }} {{ p.label }}</span>
+      </button>
     </div>
   </div>
 
@@ -47,7 +62,7 @@
         <div class="avatar">⚡</div>
         <div class="bubble assistant-bubble loading-bubble">
           <mat-spinner diameter="20"></mat-spinner>
-          <span>Analyzing RAG context & synthesizing response...</span>
+          <span>Querying {{ selectedProvider }} AI Model & synthesizing grounded response...</span>
         </div>
       </div>
     </div>

@@ -12,6 +12,11 @@ import lombok.NoArgsConstructor;
 @Builder
 public class ChatRequest {
 
-    @NotBlank(message = "Message cannot be empty")
+    @NotBlank(message = "Chat message cannot be empty")
     private String message;
+
+    private String repositoryUuid;
+    
+    @Builder.Default
+    private AiProvider aiProvider = AiProvider.GEMINI;
 }

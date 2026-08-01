@@ -6,7 +6,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { ChatMessage } from '../../../core/models/chat.model';
+import { AiProvider, ChatMessage } from '../../../core/models/chat.model';
 import { ChatService } from '../../../core/services/chat.service';
 
 @Component({
@@ -33,6 +33,7 @@ export class RepoChatComponent implements OnInit, AfterViewChecked {
 
   repoUuid: string = '';
   inputMessage: string = '';
+  selectedProvider: AiProvider = 'GEMINI';
   messages: ChatMessage[] = [];
   loading = false;
   showCitations: Record<string, boolean> = {};
@@ -43,19 +44,30 @@ export class RepoChatComponent implements OnInit, AfterViewChecked {
     'What REST API endpoints are exposed for repository management?'
   ];
 
+  providersList: { id: AiProvider; label: string; icon: string }[] = [
+    { id: 'GEMINI', label: 'Google Gemini 1.5 Pro', icon: '🤖' },
+    { id: 'OPENAI', label: 'OpenAI GPT-4o', icon: '⚡' },
+    { id: 'DEEPSEEK', label: 'DeepSeek-Coder V2', icon: '🚀' },
+    { id: 'HYBRID_ENSEMBLE', label: 'Hybrid Ensemble (Gemini + GPT-4o)', icon: '✨' }
+  ];
+
   ngOnInit(): void {
     this.repoUuid = this.route.snapshot.paramMap.get('uuid') || '';
-    // Welcome message
     this.messages.push({
       id: 'welcome',
       sender: 'ASSISTANT',
-      text: 'Hello! I am your AI CodePilot Assistant grounded in this repository. Ask me any question about architecture, code features, security, or implementation details!',
+      text: 'Hello! I am your Multi-Model AI CodePilot Assistant grounded in this repository. Choose your preferred AI engine above (Google Gemini, OpenAI GPT-4o, DeepSeek, or Hybrid Ensemble) and ask me anything!',
       timestamp: new Date()
     });
   }
 
   ngAfterViewChecked(): void {
     this.scrollToBottom();
+  }
+
+  selectProvider(provider: AiProvider): void {
+    this.selectedProvider = provider;
+    this.snackBar.open(`Switched AI Provider Engine to ${provider}`, 'Close', { duration: 2000 });
   }
 
   sendSuggestedQuestion(question: string): void {
@@ -67,6 +79,7 @@ export class RepoChatComponent implements OnInit, AfterViewChecked {
     if (!this.inputMessage || this.inputMessage.trim() === '') return;
 
     const userText = this.inputMessage.trim();
+    const provider = this.selectedProvider;
     this.inputMessage = '';
 
     const userMsg: ChatMessage = {
@@ -78,24 +91,25 @@ export class RepoChatComponent implements OnInit, AfterViewChecked {
     this.messages.push(userMsg);
     this.loading = true;
 
-    this.chatService.sendMessage(this.repoUuid, userText).subscribe({
+    this.chatService.sendMessage(this.repoUuid, userText, provider).subscribe({
       next: (response) => {
         this.loading = false;
         const assistantMsg: ChatMessage = {
           id: 'ast_' + Date.now(),
           sender: 'ASSISTANT',
           text: response.answer,
+          aiProvider: provider,
           citations: response.citations,
           timestamp: new Date()
         };
         this.messages.push(assistantMsg);
       },
-      error: (err) => {
+      error: () => {
         this.loading = false;
         const errorMsg: ChatMessage = {
           id: 'err_' + Date.now(),
           sender: 'ASSISTANT',
-          text: 'I encountered an error retrieving context for your request. Please ensure repository chunks and vector embeddings have been generated.',
+          text: 'Encountered an error retrieving context for your request. Ensure repository chunks and vector embeddings have been generated.',
           timestamp: new Date()
         };
         this.messages.push(errorMsg);

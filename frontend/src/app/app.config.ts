@@ -17,6 +17,7 @@ import { LogAnalyzerComponent } from './features/logs/log-analyzer/log-analyzer.
 import { CodeReviewerComponent } from './features/reviewer/code-reviewer/code-reviewer.component';
 import { ApiDocGeneratorComponent } from './features/docs/api-doc-generator/api-doc-generator.component';
 import { SqlOptimizerComponent } from './features/sql/sql-optimizer/sql-optimizer.component';
+import { AnalyticsDashboardComponent } from './features/analytics/analytics-dashboard/analytics-dashboard.component';
 import { authGuard } from './core/guards/auth.guard';
 import { roleGuard } from './core/guards/role.guard';
 
@@ -35,6 +36,7 @@ const routes: Routes = [
   { path: 'logs', component: LogAnalyzerComponent, canActivate: [authGuard] },
   { path: 'reviews', component: CodeReviewerComponent, canActivate: [authGuard] },
   { path: 'sql-optimizer', component: SqlOptimizerComponent, canActivate: [authGuard] },
+  { path: 'analytics', component: AnalyticsDashboardComponent, canActivate: [authGuard] },
   { path: '', redirectTo: 'repositories', pathMatch: 'full' }
 ];
 

@@ -1,0 +1,111 @@
+<div class="analytics-page-container">
+  <div class="analytics-header">
+    <div>
+      <h1>📈 Enterprise Analytics & System Control Panel</h1>
+      <p class="subtitle">Real-time platform usage statistics, vector indexing metrics, and infrastructure health indicators.</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-primary" (click)="loadMetrics()">🔄 Refresh Stats</button>
+    </div>
+  </div>
+
+  <div *ngIf="loading" class="loading-state">
+    <mat-spinner diameter="36"></mat-spinner>
+    <p>Computing platform analytics & system health metrics...</p>
+  </div>
+
+  <div *ngIf="metrics && !loading" class="dashboard-content">
+    <!-- Status Banner -->
+    <div class="system-status-banner">
+      <div class="status-left">
+        <span class="status-pulse"></span>
+        <span class="status-text">{{ metrics.systemStatus }}</span>
+      </div>
+      <div class="status-right mono">
+        <span>Java: {{ metrics.javaVersion }}</span> | 
+        <span>Spring Boot: {{ metrics.springVersion }}</span> | 
+        <span>Server Time: {{ metrics.serverTime | date:'mediumTime' }}</span>
+      </div>
+    </div>
+
+    <!-- KPI Grid -->
+    <div class="kpi-grid">
+      <div class="kpi-card accent-border">
+        <span class="kpi-icon">📂</span>
+        <div class="kpi-info">
+          <span class="kpi-label">Imported Repositories</span>
+          <span class="kpi-value">{{ metrics.totalRepositories }}</span>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <span class="kpi-icon">🧠</span>
+        <div class="kpi-info">
+          <span class="kpi-label">Tokenized Code Chunks</span>
+          <span class="kpi-value">{{ metrics.totalCodeChunks }}</span>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <span class="kpi-icon">⚡</span>
+        <div class="kpi-info">
+          <span class="kpi-label">Qdrant Vector Store Embeddings</span>
+          <span class="kpi-value">{{ metrics.totalEmbeddings }}</span>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <span class="kpi-icon">🤖</span>
+        <div class="kpi-info">
+          <span class="kpi-label">Active RAG AI Chat Sessions</span>
+          <span class="kpi-value">{{ metrics.totalAiChats }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Secondary Metrics Grid -->
+    <div class="secondary-grid">
+      <div class="metric-box">
+        <h3>Operational Service Metrics</h3>
+        <div class="metric-rows">
+          <div class="metric-row">
+            <span class="m-label">Registered Enterprise Users</span>
+            <span class="m-val mono">{{ metrics.totalUsers }}</span>
+          </div>
+          <div class="metric-row">
+            <span class="m-label">Exception Stack Trace Audits</span>
+            <span class="m-val mono">{{ metrics.totalExceptionAnalyses }}</span>
+          </div>
+          <div class="metric-row">
+            <span class="m-label">Log File Severity Scans</span>
+            <span class="m-val mono">{{ metrics.totalLogAnalyses }}</span>
+          </div>
+          <div class="metric-row">
+            <span class="m-label">PR Code Quality Reviews</span>
+            <span class="m-val mono">{{ metrics.totalCodeReviews }}</span>
+          </div>
+          <div class="metric-row">
+            <span class="m-label">Generated OpenAPI Specifications</span>
+            <span class="m-val mono">{{ metrics.totalApiDocs }}</span>
+          </div>
+          <div class="metric-row">
+            <span class="m-label">Optimized SQL Queries</span>
+            <span class="m-val mono">{{ metrics.totalSqlOptimizations }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Platform Actions -->
+      <div class="actions-box">
+        <h3>Platform Quick Actions</h3>
+        <div class="action-buttons">
+          <button class="btn-action" routerLink="/repositories">📂 Manage Repositories</button>
+          <button class="btn-action" routerLink="/debugger">🐛 Stack Trace Debugger</button>
+          <button class="btn-action" routerLink="/logs">📊 Log File Analyzer</button>
+          <button class="btn-action" routerLink="/reviews">🛡️ PR Code Reviewer</button>
+          <button class="btn-action" routerLink="/sql-optimizer">⚡ SQL Query Optimizer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

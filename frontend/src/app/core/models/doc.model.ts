@@ -3,6 +3,10 @@ export interface EndpointSummary {
   path: string;
   controllerClass: string;
   methodName: string;
+  filePath?: string;
+  startLine?: number;
+  endLine?: number;
+  sourceCodeSnippet?: string;
 }
 
 export interface ApiDocResponse {

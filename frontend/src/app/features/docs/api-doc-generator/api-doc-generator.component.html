@@ -2,7 +2,7 @@
   <div class="docs-header">
     <div>
       <a [routerLink]="['/repositories', repoUuid, 'scan']" class="back-link">← Back to Code Chunks</a>
-      <h1>📄 REST API Documentation Generator & OpenAPI Spec</h1>
+      <h1>📄 REST API Documentation & Source Code Inspector</h1>
       <p class="subtitle" *ngIf="docResult">Repository: <strong class="accent-text">{{ docResult.repoName }}</strong></p>
     </div>
     <div class="header-actions">
@@ -25,14 +25,35 @@
     <!-- Endpoints Bar -->
     <div class="endpoints-summary-card" *ngIf="docResult.endpoints && docResult.endpoints.length > 0">
       <div class="summary-top">
-        <h3>Mapped Controller Endpoints ({{ docResult.totalEndpoints }})</h3>
+        <h3>Mapped Controller Endpoints (Click an endpoint chip to view implementation code):</h3>
       </div>
       <div class="endpoint-chips">
-        <div *ngFor="let ep of docResult.endpoints" class="ep-chip">
+        <button 
+          type="button" 
+          *ngFor="let ep of docResult.endpoints" 
+          class="ep-chip-btn" 
+          [class.active-ep]="selectedEndpoint === ep"
+          (click)="selectEndpoint(ep)">
           <span class="method-badge" [class]="ep.httpMethod.toLowerCase()">{{ ep.httpMethod }}</span>
           <span class="path mono">{{ ep.path }}</span>
           <span class="ctrl mono">({{ ep.controllerClass }})</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Endpoint Source Code Inspector -->
+    <div class="code-inspector-card" *ngIf="selectedEndpoint">
+      <div class="inspector-header">
+        <div class="header-meta">
+          <span class="badge-method" [class]="selectedEndpoint.httpMethod.toLowerCase()">{{ selectedEndpoint.httpMethod }}</span>
+          <span class="ep-title mono">{{ selectedEndpoint.path }}</span>
         </div>
+        <div class="file-info mono" *ngIf="selectedEndpoint.filePath">
+          📁 {{ selectedEndpoint.filePath }} <span class="line-range">(Lines {{ selectedEndpoint.startLine }} - {{ selectedEndpoint.endLine }})</span>
+        </div>
+      </div>
+      <div class="inspector-body" *ngIf="selectedEndpoint.sourceCodeSnippet">
+        <pre><code>{{ selectedEndpoint.sourceCodeSnippet }}</code></pre>
       </div>
     </div>
 

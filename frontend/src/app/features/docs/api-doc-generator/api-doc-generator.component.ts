@@ -6,7 +6,7 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { ApiDocResponse } from '../../../core/models/doc.model';
+import { ApiDocResponse, EndpointSummary } from '../../../core/models/doc.model';
 import { DocService } from '../../../core/services/doc.service';
 
 @Component({
@@ -31,6 +31,7 @@ export class ApiDocGeneratorComponent implements OnInit {
 
   repoUuid: string = '';
   docResult: ApiDocResponse | null = null;
+  selectedEndpoint: EndpointSummary | null = null;
   loading = true;
   generating = false;
 
@@ -47,6 +48,9 @@ export class ApiDocGeneratorComponent implements OnInit {
       next: (res) => {
         this.docResult = res;
         this.loading = false;
+        if (res.endpoints && res.endpoints.length > 0) {
+          this.selectedEndpoint = res.endpoints[0];
+        }
       },
       error: () => {
         this.loading = false;
@@ -60,6 +64,9 @@ export class ApiDocGeneratorComponent implements OnInit {
       next: (res) => {
         this.generating = false;
         this.docResult = res;
+        if (res.endpoints && res.endpoints.length > 0) {
+          this.selectedEndpoint = res.endpoints[0];
+        }
         this.snackBar.open(`REST API documentation generated for ${res.totalEndpoints} endpoints!`, 'Close', { duration: 3000 });
       },
       error: () => {
@@ -67,6 +74,10 @@ export class ApiDocGeneratorComponent implements OnInit {
         this.snackBar.open('Documentation generation failed', 'Close', { duration: 3000 });
       }
     });
+  }
+
+  selectEndpoint(ep: EndpointSummary): void {
+    this.selectedEndpoint = ep;
   }
 
   copyMarkdown(): void {

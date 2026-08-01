@@ -14,4 +14,8 @@ public class EndpointSummaryDTO {
     private String path;
     private String controllerClass;
     private String methodName;
+    private String filePath;
+    private int startLine;
+    private int endLine;
+    private String sourceCodeSnippet;
 }

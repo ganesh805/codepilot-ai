@@ -1,5 +1,5 @@
 .docs-page-container {
-  max-width: 1080px;
+  max-width: 1100px;
   margin: 32px auto;
   padding: 0 20px;
 
@@ -65,9 +65,9 @@
       padding: 20px;
 
       h3 {
-        font-size: 1.1rem;
+        font-size: 0.95rem;
         margin: 0 0 14px 0;
-        color: #ffffff;
+        color: #cbd5e1;
       }
 
       .endpoint-chips {
@@ -75,15 +75,28 @@
         flex-wrap: wrap;
         gap: 10px;
 
-        .ep-chip {
+        .ep-chip-btn {
           background: #0f172a;
           border: 1px solid var(--border-color);
-          border-radius: 6px;
-          padding: 6px 12px;
+          border-radius: 8px;
+          padding: 8px 14px;
           display: flex;
           align-items: center;
-          gap: 8px;
-          font-size: 0.8rem;
+          gap: 10px;
+          font-size: 0.82rem;
+          cursor: pointer;
+          transition: all 0.2s ease;
+
+          &:hover {
+            border-color: var(--accent-color);
+            background: rgba(56, 189, 248, 0.08);
+          }
+
+          &.active-ep {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.3);
+            background: #1c2541;
+          }
 
           .method-badge {
             font-size: 0.7rem;
@@ -122,6 +135,70 @@
             color: #94a3b8;
             font-size: 0.75rem;
           }
+        }
+      }
+    }
+
+    .code-inspector-card {
+      background: #090d16;
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      border-radius: 12px;
+      overflow: hidden;
+
+      .inspector-header {
+        background: #0f172a;
+        border-bottom: 1px solid var(--border-color);
+        padding: 14px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+
+        .header-meta {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+
+          .badge-method {
+            font-size: 0.75rem;
+            font-weight: 800;
+            padding: 4px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+
+            &.get { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+            &.post { background: rgba(56, 189, 248, 0.2); color: var(--accent-color); }
+            &.put { background: rgba(234, 179, 8, 0.2); color: #facc15; }
+            &.delete { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+          }
+
+          .ep-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #ffffff;
+          }
+        }
+
+        .file-info {
+          font-size: 0.8rem;
+          color: var(--accent-color);
+
+          .line-range {
+            color: #94a3b8;
+          }
+        }
+      }
+
+      .inspector-body {
+        padding: 20px;
+
+        pre {
+          margin: 0;
+          font-family: var(--font-mono);
+          font-size: 0.85rem;
+          color: #e2e8f0;
+          line-height: 1.55;
+          white-space: pre-wrap;
+          word-break: break-word;
         }
       }
     }

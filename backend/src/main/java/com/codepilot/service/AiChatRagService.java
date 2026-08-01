@@ -26,10 +26,10 @@ public class AiChatRagService {
         log.info("Processing AI Chat RAG query for user {}: '{}' using AI Provider: {}", 
                 user.getUsername(), request.getMessage(), request.getAiProvider());
 
-        // Step 1: Retrieve top-3 relevant code context snippets via Semantic Search
+        // Step 1: Retrieve top relevant code context snippets via Semantic Search
         SearchRequest searchReq = SearchRequest.builder()
                 .query(request.getMessage())
-                .topK(3)
+                .topK(5)
                 .build();
 
         List<SearchResultDTO> searchResults = searchService.searchCodebase(user, repoUuid, searchReq);
@@ -38,6 +38,12 @@ public class AiChatRagService {
         StringBuilder contextBuilder = new StringBuilder();
 
         for (SearchResultDTO res : searchResults) {
+            String fileName = res.getFileName() != null ? res.getFileName().toLowerCase() : "";
+            // Filter out non-code build scripts (mvnw, gradlew, .cmd) to keep citations 100% relevant for beginners
+            if (fileName.contains("mvnw") || fileName.contains("gradlew") || fileName.endsWith(".cmd") || fileName.endsWith(".bat")) {
+                continue;
+            }
+
             CodeCitation citation = CodeCitation.builder()
                     .filePath(res.getFilePath())
                     .fileName(res.getFileName())
@@ -51,6 +57,8 @@ public class AiChatRagService {
 
             contextBuilder.append(String.format("File: %s (Lines %d-%d)\nLanguage: %s\n```\n%s\n```\n\n",
                     res.getFilePath(), res.getStartLine(), res.getEndLine(), res.getLanguage(), res.getContent()));
+
+            if (citations.size() >= 3) break;
         }
 
         if (citations.isEmpty()) {
@@ -60,7 +68,7 @@ public class AiChatRagService {
                     .build();
         }
 
-        // Step 2: Route prompt to selected AI Model Provider (Gemini, OpenAI GPT-4o, DeepSeek, or Hybrid Ensemble)
+        // Step 2: Route prompt to selected AI Model Provider
         String systemPrompt = "You are CodePilot AI, an expert Senior Software Architect pair-programming assistant.";
         String synthesizedAnswer = modelRouterService.generateResponse(
                 request.getAiProvider(), 

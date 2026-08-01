@@ -38,9 +38,57 @@
     }
   }
 
+  .filter-toolbar {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+
+    .search-field {
+      width: 100%;
+      margin-bottom: 12px;
+    }
+
+    .language-chips {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+
+      .filter-label {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      mat-chip {
+        font-size: 0.8rem;
+        cursor: pointer;
+        background: rgba(148, 163, 184, 0.1);
+        color: var(--text-secondary);
+        border: 1px solid var(--border-color);
+        transition: all 0.2s ease;
+
+        &.active-chip {
+          background: rgba(56, 189, 248, 0.2) !important;
+          color: var(--accent-color) !important;
+          border-color: rgba(56, 189, 248, 0.4) !important;
+          font-weight: 600;
+        }
+
+        &:hover {
+          border-color: var(--accent-color);
+        }
+      }
+    }
+  }
+
   .stats-grid {
     display: grid;
-    grid-template-columns: 220px 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: 16px;
     margin-bottom: 24px;
 
@@ -61,19 +109,10 @@
       .stat-value {
         font-size: 1.8rem;
         font-weight: 700;
-        color: var(--accent-color);
-      }
+        color: var(--text-primary);
 
-      .chip-container {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-        margin-top: 4px;
-
-        mat-chip {
-          font-size: 0.75rem;
-          background: rgba(56, 189, 248, 0.1);
-          color: var(--text-primary);
+        &.text-accent {
+          color: var(--accent-color);
         }
       }
     }

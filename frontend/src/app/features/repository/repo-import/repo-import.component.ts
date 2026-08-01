@@ -10,6 +10,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { RepositoryService } from '../../../core/services/repository.service';
+import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
   selector: 'app-repo-import',
@@ -31,11 +32,12 @@ import { RepositoryService } from '../../../core/services/repository.service';
 export class RepoImportComponent {
   private fb = inject(FormBuilder);
   private repoService = inject(RepositoryService);
+  private authService = inject(AuthService);
   private router = inject(Router);
   private snackBar = inject(MatSnackBar);
 
   githubForm: FormGroup = this.fb.group({
-    gitUrl: ['', [Validators.required, Validators.pattern('https?://.*')]],
+    gitUrl: ['https://github.com/octocat/Hello-World.git', [Validators.required, Validators.pattern('https?://.*')]],
     branch: ['']
   });
 
@@ -56,13 +58,19 @@ export class RepoImportComponent {
     this.repoService.importGithub(this.githubForm.value).subscribe({
       next: (repo) => {
         this.loading = false;
-        this.snackBar.open(`Repository '${repo.name}' imported successfully!`, 'Close', { duration: 3000 });
+        this.snackBar.open(`Repository '${repo.name}' import started!`, 'Close', { duration: 3000 });
         this.router.navigate(['/repositories']);
       },
       error: (err) => {
         this.loading = false;
-        const msg = err.error?.message || 'GitHub import failed. Ensure repository URL is valid and public.';
-        this.snackBar.open(msg, 'Close', { duration: 5000 });
+        if (err.status === 401 || err.status === 403) {
+          this.snackBar.open('Session expired. Please click Sign Out and log in again.', 'Close', { duration: 5000 });
+          this.authService.logout();
+          this.router.navigate(['/login']);
+        } else {
+          const msg = err.error?.message || 'GitHub import failed. Ensure repository URL is valid and public.';
+          this.snackBar.open(msg, 'Close', { duration: 5000 });
+        }
       }
     });
   }
@@ -86,8 +94,14 @@ export class RepoImportComponent {
       },
       error: (err) => {
         this.loading = false;
-        const msg = err.error?.message || 'ZIP extraction failed. Ensure file is a valid .zip archive.';
-        this.snackBar.open(msg, 'Close', { duration: 5000 });
+        if (err.status === 401 || err.status === 403) {
+          this.snackBar.open('Session expired. Please log in again.', 'Close', { duration: 5000 });
+          this.authService.logout();
+          this.router.navigate(['/login']);
+        } else {
+          const msg = err.error?.message || 'ZIP extraction failed. Ensure file is a valid .zip archive.';
+          this.snackBar.open(msg, 'Close', { duration: 5000 });
+        }
       }
     });
   }

@@ -1,10 +1,13 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatInputModule } from '@angular/material/input';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
@@ -16,11 +19,14 @@ import { ScannerService } from '../../../core/services/scanner.service';
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     RouterLink,
     MatCardModule,
     MatButtonModule,
     MatIconModule,
     MatChipsModule,
+    MatInputModule,
+    MatFormFieldModule,
     MatProgressSpinnerModule,
     MatSnackBarModule,
     MatPaginatorModule
@@ -35,8 +41,13 @@ export class RepoScannerComponent implements OnInit {
 
   repoUuid: string = '';
   chunks: CodeChunk[] = [];
+  filteredChunks: CodeChunk[] = [];
   pagedChunks: CodeChunk[] = [];
   stats: ScanStats | null = null;
+
+  searchQuery: string = '';
+  selectedLanguage: string = 'ALL';
+
   loading = true;
   scanning = false;
 
@@ -55,7 +66,7 @@ export class RepoScannerComponent implements OnInit {
     this.scannerService.getChunks(this.repoUuid).subscribe({
       next: (chunks) => {
         this.chunks = chunks;
-        this.updatePagedChunks();
+        this.applyFilters();
         this.loadStats();
         this.loading = false;
       },
@@ -79,16 +90,53 @@ export class RepoScannerComponent implements OnInit {
       next: (chunks) => {
         this.scanning = false;
         this.chunks = chunks;
-        this.pageIndex = 0;
-        this.updatePagedChunks();
+        this.applyFilters();
         this.loadStats();
         this.snackBar.open(`Repository scanned successfully! ${chunks.length} chunks generated.`, 'Close', { duration: 3000 });
       },
-      error: (err) => {
+      error: () => {
         this.scanning = false;
         this.snackBar.open('Scanning failed. Check repository file tree.', 'Close', { duration: 4000 });
       }
     });
+  }
+
+  filterByLanguage(lang: string): void {
+    this.selectedLanguage = lang;
+    this.pageIndex = 0;
+    this.applyFilters();
+  }
+
+  onSearchChange(): void {
+    this.pageIndex = 0;
+    this.applyFilters();
+  }
+
+  clearSearch(): void {
+    this.searchQuery = '';
+    this.onSearchChange();
+  }
+
+  private applyFilters(): void {
+    let result = [...this.chunks];
+
+    // Filter by Language
+    if (this.selectedLanguage !== 'ALL') {
+      result = result.filter(c => c.language.toLowerCase() === this.selectedLanguage.toLowerCase());
+    }
+
+    // Filter by Search Query (File Name or Path or Content)
+    if (this.searchQuery && this.searchQuery.trim() !== '') {
+      const q = this.searchQuery.trim().toLowerCase();
+      result = result.filter(c => 
+        c.fileName.toLowerCase().includes(q) || 
+        c.filePath.toLowerCase().includes(q) ||
+        c.content.toLowerCase().includes(q)
+      );
+    }
+
+    this.filteredChunks = result;
+    this.updatePagedChunks();
   }
 
   onPageChange(event: PageEvent): void {
@@ -99,7 +147,7 @@ export class RepoScannerComponent implements OnInit {
 
   private updatePagedChunks(): void {
     const startIndex = this.pageIndex * this.pageSize;
-    this.pagedChunks = this.chunks.slice(startIndex, startIndex + this.pageSize);
+    this.pagedChunks = this.filteredChunks.slice(startIndex, startIndex + this.pageSize);
   }
 
   getLanguageKeys(): string[] {

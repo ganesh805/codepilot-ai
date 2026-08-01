@@ -11,26 +11,29 @@
         <form [formGroup]="githubForm" (ngSubmit)="onGithubSubmit()" class="tab-form">
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>GitHub Repository URL</mat-label>
-            <input matInput formControlName="gitUrl" placeholder="https://github.com/spring-projects/spring-petclinic.git">
+            <input matInput formControlName="gitUrl" placeholder="https://github.com/octocat/Hello-World.git">
             <mat-error *ngIf="githubForm.get('gitUrl')?.hasError('required')">GitHub URL is required</mat-error>
             <mat-error *ngIf="githubForm.get('gitUrl')?.hasError('pattern')">Enter a valid HTTP/HTTPS URL</mat-error>
           </mat-form-field>
 
           <div class="samples-box">
-            <span class="sample-label">Try a sample public repository:</span>
+            <span class="sample-label">Click a sample public repository to test instantly:</span>
             <div class="sample-buttons">
-              <button type="button" class="sample-chip" (click)="fillSampleUrl('https://github.com/spring-projects/spring-petclinic.git')">
-                🌱 spring-petclinic (Java)
+              <button type="button" class="sample-chip" (click)="fillSampleUrl('https://github.com/octocat/Hello-World.git')">
+                🐱 octocat/Hello-World (Instant Test)
               </button>
               <button type="button" class="sample-chip" (click)="fillSampleUrl('https://github.com/expressjs/express.git')">
                 ⚡ express (Node.js)
+              </button>
+              <button type="button" class="sample-chip" (click)="fillSampleUrl('https://github.com/spring-projects/spring-petclinic.git')">
+                🌱 spring-petclinic (Java)
               </button>
             </div>
           </div>
 
           <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Target Branch</mat-label>
-            <input matInput formControlName="branch" placeholder="main or master">
+            <mat-label>Target Branch (Optional)</mat-label>
+            <input matInput formControlName="branch" placeholder="Leave empty for default branch">
           </mat-form-field>
 
           <button mat-flat-button color="primary" class="submit-btn" [disabled]="githubForm.invalid || loading">

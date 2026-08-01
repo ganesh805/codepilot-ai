@@ -1,0 +1,156 @@
+.docs-page-container {
+  max-width: 1080px;
+  margin: 32px auto;
+  padding: 0 20px;
+
+  .back-link {
+    color: var(--accent-color);
+    text-decoration: none;
+    font-size: 0.85rem;
+    display: inline-block;
+    margin-bottom: 8px;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  .docs-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin: 0 0 4px 0;
+      color: var(--text-primary);
+    }
+
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      margin: 0;
+
+      .accent-text {
+        color: var(--accent-color);
+      }
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+  }
+
+  .loading-state {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    color: var(--text-secondary);
+    padding: 60px 0;
+  }
+
+  .docs-content-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+
+    .endpoints-summary-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+
+      h3 {
+        font-size: 1.1rem;
+        margin: 0 0 14px 0;
+        color: #ffffff;
+      }
+
+      .endpoint-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+
+        .ep-chip {
+          background: #0f172a;
+          border: 1px solid var(--border-color);
+          border-radius: 6px;
+          padding: 6px 12px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 0.8rem;
+
+          .method-badge {
+            font-size: 0.7rem;
+            font-weight: 800;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+
+            &.get {
+              background: rgba(34, 197, 94, 0.2);
+              color: #4ade80;
+            }
+
+            &.post {
+              background: rgba(56, 189, 248, 0.2);
+              color: var(--accent-color);
+            }
+
+            &.put {
+              background: rgba(234, 179, 8, 0.2);
+              color: #facc15;
+            }
+
+            &.delete {
+              background: rgba(239, 68, 68, 0.2);
+              color: #f87171;
+            }
+          }
+
+          .path {
+            color: #ffffff;
+            font-weight: 600;
+          }
+
+          .ctrl {
+            color: #94a3b8;
+            font-size: 0.75rem;
+          }
+        }
+      }
+    }
+
+    .spec-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+
+      .spec-tab-body {
+        padding-top: 16px;
+
+        pre {
+          margin: 0;
+          background: #090d16;
+          border: 1px solid var(--border-color);
+          border-radius: 8px;
+          padding: 20px;
+          font-family: var(--font-mono);
+          font-size: 0.85rem;
+          color: #e2e8f0;
+          line-height: 1.55;
+          white-space: pre-wrap;
+          word-break: break-word;
+          max-height: 540px;
+          overflow-y: auto;
+        }
+      }
+    }
+  }
+}

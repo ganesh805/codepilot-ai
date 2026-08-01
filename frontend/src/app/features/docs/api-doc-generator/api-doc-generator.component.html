@@ -1,0 +1,56 @@
+<div class="docs-page-container">
+  <div class="docs-header">
+    <div>
+      <a [routerLink]="['/repositories', repoUuid, 'scan']" class="back-link">← Back to Code Chunks</a>
+      <h1>📄 REST API Documentation Generator & OpenAPI Spec</h1>
+      <p class="subtitle" *ngIf="docResult">Repository: <strong class="accent-text">{{ docResult.repoName }}</strong></p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-secondary" (click)="copyMarkdown()" *ngIf="docResult">
+        📋 Copy Markdown
+      </button>
+      <button class="btn-primary" (click)="triggerDocGeneration()" [disabled]="generating">
+        <mat-spinner diameter="20" *ngIf="generating"></mat-spinner>
+        <span *ngIf="!generating">⚡ Re-Scan & Generate OpenAPI Spec</span>
+      </button>
+    </div>
+  </div>
+
+  <div *ngIf="loading" class="loading-state">
+    <mat-spinner diameter="36"></mat-spinner>
+    <p>Scanning Spring REST controller annotations & mappings...</p>
+  </div>
+
+  <div *ngIf="docResult && !loading" class="docs-content-grid">
+    <!-- Endpoints Bar -->
+    <div class="endpoints-summary-card" *ngIf="docResult.endpoints && docResult.endpoints.length > 0">
+      <div class="summary-top">
+        <h3>Mapped Controller Endpoints ({{ docResult.totalEndpoints }})</h3>
+      </div>
+      <div class="endpoint-chips">
+        <div *ngFor="let ep of docResult.endpoints" class="ep-chip">
+          <span class="method-badge" [class]="ep.httpMethod.toLowerCase()">{{ ep.httpMethod }}</span>
+          <span class="path mono">{{ ep.path }}</span>
+          <span class="ctrl mono">({{ ep.controllerClass }})</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dual Tab Spec View -->
+    <div class="spec-card">
+      <mat-tab-group animationDuration="200ms">
+        <mat-tab label="Markdown API Specification">
+          <div class="spec-tab-body">
+            <pre><code>{{ docResult.markdownSpec }}</code></pre>
+          </div>
+        </mat-tab>
+
+        <mat-tab label="OpenAPI 3.0 JSON Specification">
+          <div class="spec-tab-body">
+            <pre><code>{{ docResult.openapiJson }}</code></pre>
+          </div>
+        </mat-tab>
+      </mat-tab-group>
+    </div>
+  </div>
+</div>

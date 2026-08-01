@@ -5,10 +5,15 @@
       <h1>Code Chunking & AST Scanner Engine</h1>
       <p class="subtitle" *ngIf="stats">Repository: <strong class="accent-text">{{ stats.repoName }}</strong></p>
     </div>
-    <button class="btn-primary" (click)="triggerScan()" [disabled]="scanning">
-      <mat-spinner diameter="20" *ngIf="scanning"></mat-spinner>
-      <span *ngIf="!scanning">🧠 Re-Scan & Generate Chunks</span>
-    </button>
+    <div class="header-actions">
+      <button class="btn-primary" (click)="triggerScan()" [disabled]="scanning">
+        <mat-spinner diameter="20" *ngIf="scanning"></mat-spinner>
+        <span *ngIf="!scanning">🧠 Re-Scan & Generate Chunks</span>
+      </button>
+      <button class="btn-secondary" [routerLink]="['/repositories', repoUuid, 'embedding']">
+        ⚡ Vector Embeddings & Qdrant
+      </button>
+    </div>
   </div>
 
   <!-- Search & Language Filter Bar -->

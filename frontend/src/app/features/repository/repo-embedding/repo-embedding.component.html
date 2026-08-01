@@ -1,0 +1,67 @@
+<div class="embedding-container">
+  <div class="embedding-header">
+    <div>
+      <a [routerLink]="['/repositories', repoUuid, 'scan']" class="back-link">← Back to Code Chunks</a>
+      <h1>Vector Embedding Generator & Qdrant Store</h1>
+      <p class="subtitle" *ngIf="stats">Repository: <strong class="accent-text">{{ stats.repoName }}</strong></p>
+    </div>
+    <button class="btn-primary" (click)="triggerEmbeddingGeneration()" [disabled]="generating">
+      <mat-spinner diameter="20" *ngIf="generating"></mat-spinner>
+      <span *ngIf="!generating">⚡ Generate Vectors & Index in Qdrant</span>
+    </button>
+  </div>
+
+  <mat-progress-bar mode="indeterminate" *ngIf="generating" class="progress-bar"></mat-progress-bar>
+
+  <div *ngIf="loading" class="loading-state">
+    <mat-spinner diameter="36"></mat-spinner>
+    <p>Loading vector store metrics...</p>
+  </div>
+
+  <!-- Metrics Grid -->
+  <div *ngIf="stats && !loading" class="stats-grid">
+    <div class="stat-card">
+      <span class="stat-label">Indexed Vector Points</span>
+      <span class="stat-value text-accent">{{ stats.indexedVectors }} / {{ stats.totalChunks }}</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Vector Dimension</span>
+      <span class="stat-value">{{ stats.vectorDimension }}-D</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Qdrant Collection</span>
+      <span class="stat-value mono font-sm">{{ stats.collectionName }}</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Distance Metric</span>
+      <span class="stat-value mono font-sm">{{ stats.distanceMetric }}</span>
+    </div>
+  </div>
+
+  <!-- Status Banner -->
+  <div *ngIf="stats && !loading" class="status-banner" [class.complete]="stats.indexingStatus === 'COMPLETE'">
+    <div class="banner-info">
+      <span class="status-icon">{{ stats.indexingStatus === 'COMPLETE' ? '✅' : '⏳' }}</span>
+      <div>
+        <h4>Vector Indexing Status: {{ stats.indexingStatus }}</h4>
+        <p *ngIf="stats.indexingStatus === 'COMPLETE'">All code chunks are vector-embedded and ready for high-speed semantic RAG search!</p>
+        <p *ngIf="stats.indexingStatus !== 'COMPLETE'">Vector embeddings have not been generated for all chunks yet. Click the button above to index.</p>
+      </div>
+    </div>
+    <button class="btn-primary" (click)="triggerEmbeddingGeneration()" *ngIf="stats.indexingStatus !== 'COMPLETE'">
+      Index Vectors Now
+    </button>
+  </div>
+
+  <!-- Indexed Embeddings Preview List -->
+  <div *ngIf="embeddings.length > 0" class="embedding-preview-list">
+    <h3>Recently Indexed Vectors ({{ embeddings.length }})</h3>
+    <div class="vector-table">
+      <div *ngFor="let item of embeddings" class="vector-row">
+        <div class="file-path mono">{{ item.filePath }}</div>
+        <div class="point-id mono">ID: {{ item.qdrantPointId }}</div>
+        <span class="badge-status">{{ item.status }}</span>
+      </div>
+    </div>
+  </div>
+</div>

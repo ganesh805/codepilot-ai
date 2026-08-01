@@ -114,7 +114,16 @@ public class ExceptionDebuggerService {
             return "Source class parameter must not be null in SpringApplication.run()";
         }
         String[] lines = input.split("\n");
-        return lines.length > 0 ? lines[0] : "Unhandled Exception Occurred";
+        StringBuilder sb = new StringBuilder();
+        int count = 0;
+        for (String line : lines) {
+            if (!line.trim().isEmpty()) {
+                sb.append(line.trim()).append("\n");
+                count++;
+                if (count >= 3) break;
+            }
+        }
+        return sb.length() > 0 ? sb.toString().trim() : "Multi-line code snippet analyzed";
     }
 
     private String buildRootCauseDiagnosis(String type, String message, String input) {
@@ -134,7 +143,7 @@ public class ExceptionDebuggerService {
             sb.append("**Root Cause**: Detected broken Spring Boot application launcher configuration.\n");
             sb.append("**Diagnosis**: Check `main` method arguments in `TaskmanagerApplication.java`.\n");
         } else {
-            sb.append(String.format("**Root Cause**: Handled runtime execution failure: `%s`.\n", message));
+            sb.append(String.format("**Root Cause**: Handled runtime execution failure:\n```\n%s\n```\n", message));
         }
 
         return sb.toString();
@@ -143,7 +152,6 @@ public class ExceptionDebuggerService {
     private String buildSuggestedFixCode(String type, String message, String input) {
         if (input.contains("SpringApplication.run(null") || type.contains("IllegalArgumentException") || type.contains("SpringBootApplicationStartupError")) {
             return """
-                   // 🟢 100% CORRECTED FIXED CODE:
                    package com.ganesh.taskmanager;
 
                    import org.springframework.boot.SpringApplication;

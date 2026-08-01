@@ -1,0 +1,108 @@
+<div class="reviewer-page-container">
+  <div class="reviewer-header">
+    <h1>🛡️ AI Code Reviewer & OWASP Security Scanner</h1>
+    <p class="subtitle">Paste Git diff patches or pull request unified diffs to analyze code quality, security vulnerabilities, and formatting guidelines.</p>
+  </div>
+
+  <div class="reviewer-grid">
+    <!-- Input Panel -->
+    <div class="input-panel">
+      <div class="card-box">
+        <h3>PR Code Diff Input</h3>
+
+        <div class="form-group">
+          <label class="input-label">Pull Request Title:</label>
+          <input type="text" class="custom-input" [(ngModel)]="prTitleInput" placeholder="e.g. Feature/Add Auth Endpoint">
+        </div>
+
+        <div class="preset-bar">
+          <span class="preset-label">Sample Diff Presets:</span>
+          <div class="preset-chips">
+            <button type="button" *ngFor="let sample of sampleDiffs" class="preset-chip" (click)="loadPreset(sample.title, sample.diff)">
+              🔍 {{ sample.label }}
+            </button>
+          </div>
+        </div>
+
+        <textarea 
+          class="custom-textarea mono" 
+          rows="12" 
+          [(ngModel)]="diffInput" 
+          placeholder="Paste unified Git diff patch here (e.g. diff --git a/... b/...)"
+        ></textarea>
+
+        <button class="btn-primary btn-analyze" (click)="runReview()" [disabled]="loading">
+          <mat-spinner diameter="20" *ngIf="loading"></mat-spinner>
+          <span *ngIf="!loading">🛡️ Run AI Code Review & Security Audit</span>
+        </button>
+      </div>
+
+      <!-- History -->
+      <div class="card-box history-box" *ngIf="history.length > 0">
+        <h3>Review History</h3>
+        <div class="history-list">
+          <div *ngFor="let item of history" class="history-item" (click)="reviewResult = item">
+            <div class="item-title">
+              <span class="pr-name">{{ item.prTitle }}</span>
+              <span class="item-time mono">{{ item.createdAt | date:'shortTime' }}</span>
+            </div>
+            <div class="item-meta mono">
+              <span>Score: <strong [class.score-good]="item.qualityScore >= 80" [class.score-bad]="item.qualityScore < 80">{{ item.qualityScore }}/100</strong></span> | 
+              <span class="sec-text">Security Alerts: {{ item.securityIssuesCount }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results Panel -->
+    <div class="result-panel">
+      <div *ngIf="!reviewResult && !loading" class="empty-result">
+        <span class="empty-icon">🛡️</span>
+        <h3>Ready for Code Audit</h3>
+        <p>Paste a Git diff patch or select a preset on the left to run security vulnerability scanning & quality scoring.</p>
+      </div>
+
+      <div *ngIf="loading" class="loading-state">
+        <mat-spinner diameter="36"></mat-spinner>
+        <p>Parsing diff frames & auditing OWASP security patterns...</p>
+      </div>
+
+      <div *ngIf="reviewResult && !loading" class="analysis-result-card">
+        <div class="result-top">
+          <h3>Review: <span class="accent-text">{{ reviewResult.prTitle }}</span></h3>
+          <span class="date mono">{{ reviewResult.createdAt | date:'medium' }}</span>
+        </div>
+
+        <!-- Metric Score Cards -->
+        <div class="score-grid">
+          <div class="score-card" [class.high-score]="reviewResult.qualityScore >= 80" [class.low-score]="reviewResult.qualityScore < 80">
+            <span class="label">Quality Score</span>
+            <span class="val">{{ reviewResult.qualityScore }} / 100</span>
+          </div>
+          <div class="score-card sec-card" [class.has-sec-issues]="reviewResult.securityIssuesCount > 0">
+            <span class="label">Security Vulnerabilities</span>
+            <span class="val">{{ reviewResult.securityIssuesCount }}</span>
+          </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="summary-box">
+          <div class="markdown-body">
+            <pre><code>{{ reviewResult.summary }}</code></pre>
+          </div>
+        </div>
+
+        <!-- Security Alerts -->
+        <div *ngIf="reviewResult.securityAlerts && reviewResult.securityAlerts.length > 0" class="alerts-box">
+          <h3>Security Vulnerability Alerts ({{ reviewResult.securityAlerts.length }})</h3>
+          <div class="alerts-list">
+            <div *ngFor="let alert of reviewResult.securityAlerts" class="alert-item mono">
+              {{ alert }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

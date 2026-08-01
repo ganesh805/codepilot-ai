@@ -14,6 +14,7 @@ import { RepoSearchComponent } from './features/repository/repo-search/repo-sear
 import { RepoChatComponent } from './features/repository/repo-chat/repo-chat.component';
 import { ExceptionAnalyzerComponent } from './features/debugger/exception-analyzer/exception-analyzer.component';
 import { LogAnalyzerComponent } from './features/logs/log-analyzer/log-analyzer.component';
+import { CodeReviewerComponent } from './features/reviewer/code-reviewer/code-reviewer.component';
 import { authGuard } from './core/guards/auth.guard';
 import { roleGuard } from './core/guards/role.guard';
 
@@ -29,6 +30,7 @@ const routes: Routes = [
   { path: 'repositories/:uuid/chat', component: RepoChatComponent, canActivate: [authGuard] },
   { path: 'debugger', component: ExceptionAnalyzerComponent, canActivate: [authGuard] },
   { path: 'logs', component: LogAnalyzerComponent, canActivate: [authGuard] },
+  { path: 'reviews', component: CodeReviewerComponent, canActivate: [authGuard] },
   { path: '', redirectTo: 'repositories', pathMatch: 'full' }
 ];
 

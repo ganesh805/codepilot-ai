@@ -1,0 +1,119 @@
+<div class="log-page-container">
+  <div class="log-header">
+    <h1>📊 Application Log File Analyzer & Severity Metrics</h1>
+    <p class="subtitle">Upload or paste server log files (`.log`, `.txt`) to analyze error frequencies, severity spikes, and system health status.</p>
+  </div>
+
+  <div class="log-grid">
+    <!-- Input Panel -->
+    <div class="input-panel">
+      <div class="card-box">
+        <div class="upload-drop-zone">
+          <span class="zone-icon">📄</span>
+          <h4>Upload Log File (.log, .txt)</h4>
+          <input type="file" #fileInput (change)="onFileSelected($event)" accept=".log,.txt" style="display: none;">
+          <button class="btn-secondary" (click)="fileInput.click()">Select Log File</button>
+        </div>
+
+        <div class="divider"><span>OR PASTE LOG TEXT</span></div>
+
+        <div class="preset-bar">
+          <span class="preset-label">Sample Logs:</span>
+          <div class="preset-chips">
+            <button type="button" *ngFor="let sample of sampleLogs" class="preset-chip" (click)="loadPreset(sample.content)">
+              📋 {{ sample.label }}
+            </button>
+          </div>
+        </div>
+
+        <textarea 
+          class="custom-textarea mono" 
+          rows="10" 
+          [(ngModel)]="logTextInput" 
+          placeholder="Paste raw log lines here..."
+        ></textarea>
+
+        <button class="btn-primary btn-analyze" (click)="analyzeText()" [disabled]="loading">
+          <mat-spinner diameter="20" *ngIf="loading"></mat-spinner>
+          <span *ngIf="!loading">📊 Analyze Log Content & Severity Metrics</span>
+        </button>
+      </div>
+
+      <!-- History -->
+      <div class="card-box history-box" *ngIf="history.length > 0">
+        <h3>Log Analysis History</h3>
+        <div class="history-list">
+          <div *ngFor="let item of history" class="history-item" (click)="analysisResult = item">
+            <div class="item-title">
+              <span class="file-name mono">{{ item.fileName }}</span>
+              <span class="item-time mono">{{ item.createdAt | date:'shortTime' }}</span>
+            </div>
+            <div class="item-meta mono">
+              <span>Lines: {{ item.totalLines }}</span> | 
+              <span class="err-text">ERR: {{ item.errorCount }}</span> | 
+              <span class="warn-text">WARN: {{ item.warnCount }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Result Panel -->
+    <div class="result-panel">
+      <div *ngIf="!analysisResult && !loading" class="empty-result">
+        <span class="empty-icon">📈</span>
+        <h3>Ready for Log Analysis</h3>
+        <p>Upload a `.log` file or paste log text on the left to compute severity metrics and health status.</p>
+      </div>
+
+      <div *ngIf="loading" class="loading-state">
+        <mat-spinner diameter="36"></mat-spinner>
+        <p>Scanning log lines & classifying severity levels...</p>
+      </div>
+
+      <div *ngIf="analysisResult && !loading" class="analysis-result-card">
+        <div class="result-top">
+          <h3>Log Summary: <span class="mono accent-text">{{ analysisResult.fileName }}</span></h3>
+          <span class="date mono">{{ analysisResult.createdAt | date:'medium' }}</span>
+        </div>
+
+        <!-- Severity Cards -->
+        <div class="severity-grid">
+          <div class="severity-card total-card">
+            <span class="label">Total Lines</span>
+            <span class="val">{{ analysisResult.totalLines }}</span>
+          </div>
+          <div class="severity-card err-card">
+            <span class="label">Errors / Exceptions</span>
+            <span class="val">{{ analysisResult.errorCount }}</span>
+          </div>
+          <div class="severity-card warn-card">
+            <span class="label">Warnings</span>
+            <span class="val">{{ analysisResult.warnCount }}</span>
+          </div>
+          <div class="severity-card info-card">
+            <span class="label">Info Entries</span>
+            <span class="val">{{ analysisResult.infoCount }}</span>
+          </div>
+        </div>
+
+        <!-- Summary Report -->
+        <div class="summary-box">
+          <div class="markdown-body">
+            <pre><code>{{ analysisResult.summary }}</code></pre>
+          </div>
+        </div>
+
+        <!-- Flagged Error Lines -->
+        <div *ngIf="analysisResult.flaggedErrorLines && analysisResult.flaggedErrorLines.length > 0" class="flagged-box">
+          <h3>Flagged Critical Error Entries (Top {{ analysisResult.flaggedErrorLines.length }})</h3>
+          <div class="flagged-list">
+            <div *ngFor="let errLine of analysisResult.flaggedErrorLines" class="flagged-item mono">
+              {{ errLine }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

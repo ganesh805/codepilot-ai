@@ -5,52 +5,60 @@
       <h1>Code Chunking & AST Scanner Engine</h1>
       <p class="subtitle" *ngIf="stats">Repository: <strong class="accent-text">{{ stats.repoName }}</strong></p>
     </div>
-    <button mat-flat-button color="primary" (click)="triggerScan()" [disabled]="scanning">
+    <button class="btn-primary" (click)="triggerScan()" [disabled]="scanning">
       <mat-spinner diameter="20" *ngIf="scanning"></mat-spinner>
-      <mat-icon *ngIf="!scanning">psychology</mat-icon>
-      <span *ngIf="!scanning">Re-Scan & Generate Chunks</span>
+      <span *ngIf="!scanning">🧠 Re-Scan & Generate Chunks</span>
     </button>
   </div>
 
   <!-- Search & Language Filter Bar -->
   <div class="filter-toolbar" *ngIf="!loading && chunks.length > 0">
-    <mat-form-field appearance="outline" class="search-field">
-      <mat-label>Search file name, path, or code (e.g. Role.java)</mat-label>
-      <input matInput [(ngModel)]="searchQuery" (input)="onSearchChange()" placeholder="e.g. Role.java or User">
-      <button mat-icon-button matSuffix *ngIf="searchQuery" (click)="clearSearch()">
-        <mat-icon>close</mat-icon>
+    <div class="search-box-wrapper">
+      <span class="search-icon-prefix">🔍</span>
+      <input 
+        type="text" 
+        class="custom-search-input" 
+        [(ngModel)]="searchQuery" 
+        (input)="onSearchChange()" 
+        placeholder="Search file name, path, or code (e.g. Role.java)..."
+      />
+      <button type="button" class="clear-btn" *ngIf="searchQuery" (click)="clearSearch()">
+        ✖
       </button>
-      <mat-icon matPrefix>search</mat-icon>
-    </mat-form-field>
+    </div>
 
     <div class="language-chips" *ngIf="stats">
       <span class="filter-label">Filter by Language:</span>
-      <mat-chip-set>
-        <mat-chip 
+      <div class="chip-set">
+        <button 
+          type="button"
+          class="custom-chip"
           [class.active-chip]="selectedLanguage === 'ALL'" 
           (click)="filterByLanguage('ALL')">
           All ({{ chunks.length }})
-        </mat-chip>
-        <mat-chip 
+        </button>
+        <button 
+          type="button"
           *ngFor="let lang of getLanguageKeys()" 
+          class="custom-chip"
           [class.active-chip]="selectedLanguage === lang"
           (click)="filterByLanguage(lang)">
           {{ lang }} ({{ stats.languageBreakdown[lang] }})
-        </mat-chip>
-      </mat-chip-set>
+        </button>
+      </div>
     </div>
   </div>
 
   <!-- Stats Cards -->
   <div *ngIf="stats && chunks.length > 0" class="stats-grid">
-    <mat-card class="stat-card">
+    <div class="stat-card">
       <span class="stat-label">Total Code Chunks</span>
       <span class="stat-value">{{ stats.totalChunks }}</span>
-    </mat-card>
-    <mat-card class="stat-card">
+    </div>
+    <div class="stat-card">
       <span class="stat-label">Filtered Results</span>
       <span class="stat-value text-accent">{{ filteredChunks.length }}</span>
-    </mat-card>
+    </div>
   </div>
 
   <div *ngIf="loading" class="loading-state">
@@ -59,27 +67,27 @@
   </div>
 
   <div *ngIf="!loading && chunks.length === 0" class="empty-state">
-    <mat-icon class="empty-icon">memory</mat-icon>
+    <span class="empty-icon">🧠</span>
     <h3>No Code Chunks Generated Yet</h3>
     <p>Run the AST Scanner Engine to tokenize code files into overlapping semantic chunks.</p>
-    <button mat-flat-button color="primary" (click)="triggerScan()">Run Scanner Engine</button>
+    <button class="btn-primary" (click)="triggerScan()">Run Scanner Engine</button>
   </div>
 
   <div *ngIf="!loading && chunks.length > 0 && filteredChunks.length === 0" class="empty-state">
-    <mat-icon class="empty-icon">search_off</mat-icon>
+    <span class="empty-icon">🔍</span>
     <h3>No Matching Code Chunks Found</h3>
     <p>No chunks match your search query "{{ searchQuery }}" or selected language filter.</p>
-    <button mat-stroked-button color="primary" (click)="clearSearch(); filterByLanguage('ALL')">Clear Filters</button>
+    <button class="btn-secondary" (click)="clearSearch(); filterByLanguage('ALL')">Clear Filters</button>
   </div>
 
   <!-- Chunk List -->
   <div *ngIf="!loading && filteredChunks.length > 0" class="chunk-section">
     <div class="chunk-list">
-      <mat-card *ngFor="let chunk of pagedChunks" class="chunk-card">
+      <div *ngFor="let chunk of pagedChunks" class="chunk-card">
         <div class="chunk-header">
           <div class="file-meta">
             <span class="file-path mono">{{ chunk.filePath }}</span>
-            <mat-chip class="lang-chip">{{ chunk.language }}</mat-chip>
+            <span class="lang-badge">{{ chunk.language }}</span>
           </div>
           <div class="chunk-range mono">
             Lines {{ chunk.startLine }} - {{ chunk.endLine }} ({{ chunk.tokenCount }} tokens)
@@ -88,7 +96,7 @@
         <div class="chunk-body">
           <pre><code>{{ chunk.content }}</code></pre>
         </div>
-      </mat-card>
+      </div>
     </div>
 
     <mat-paginator

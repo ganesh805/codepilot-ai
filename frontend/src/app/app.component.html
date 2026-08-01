@@ -7,21 +7,21 @@
 
     <div class="auth-actions">
       <ng-container *ngIf="authService.isAuthenticated(); else unauthenticated">
-        <button mat-button routerLink="/repositories" class="nav-btn">
+        <button class="nav-btn" routerLink="/repositories">
           📂 Repositories
         </button>
-        <button mat-button color="accent" routerLink="/admin" *ngIf="authService.isAdmin()" class="nav-btn">
+        <button class="nav-btn accent-nav" routerLink="/admin" *ngIf="authService.isAdmin()">
           🛡️ Admin Panel
         </button>
         <div class="user-chip">
           <span class="user-name">{{ authService.currentUser()?.firstName }} {{ authService.currentUser()?.lastName }}</span>
           <span class="user-email mono">({{ authService.currentUser()?.username }})</span>
         </div>
-        <button mat-button color="warn" (click)="logout()">Sign Out</button>
+        <button class="nav-btn logout-nav" (click)="logout()">Sign Out</button>
       </ng-container>
       <ng-template #unauthenticated>
-        <button mat-button routerLink="/login">Sign In</button>
-        <button mat-flat-button color="primary" routerLink="/register">Register</button>
+        <button class="nav-btn" routerLink="/login">Sign In</button>
+        <button class="btn-primary" routerLink="/register">Register</button>
       </ng-template>
     </div>
   </header>

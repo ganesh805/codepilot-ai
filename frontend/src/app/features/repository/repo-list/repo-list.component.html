@@ -2,10 +2,10 @@
   <div class="repos-header">
     <div>
       <h1>Code Repositories</h1>
-      <p>Manage imported codebases and repositories for AI analysis.</p>
+      <p class="subtitle">Manage imported codebases and repositories for AI analysis.</p>
     </div>
-    <button mat-flat-button color="primary" routerLink="/repositories/import">
-      <mat-icon>add</mat-icon> Import Repository
+    <button mat-flat-button color="primary" routerLink="/repositories/import" class="btn-primary-header">
+      <span class="icon">➕</span> Import Repository
     </button>
   </div>
 
@@ -15,17 +15,19 @@
   </div>
 
   <div *ngIf="!loading && repositories.length === 0" class="empty-state">
-    <mat-icon class="empty-icon">folder_open</mat-icon>
+    <span class="empty-icon">📂</span>
     <h3>No Repositories Imported Yet</h3>
     <p>Import your first GitHub repository or ZIP project archive to enable AI code assistant analysis.</p>
-    <button mat-flat-button color="primary" routerLink="/repositories/import">Import Repository</button>
+    <button mat-flat-button color="primary" routerLink="/repositories/import" class="btn-primary-header">
+      ➕ Import Repository
+    </button>
   </div>
 
   <div *ngIf="!loading && repositories.length > 0" class="repo-grid">
-    <mat-card *ngFor="let repo of repositories" class="repo-card">
+    <div *ngFor="let repo of repositories" class="repo-card">
       <div class="card-header">
         <div class="repo-title">
-          <mat-icon>{{ repo.importType === 'GITHUB' ? 'code' : 'folder_zip' }}</mat-icon>
+          <span class="type-icon">{{ repo.importType === 'GITHUB' ? '💻' : '📦' }}</span>
           <span class="name">{{ repo.name }}</span>
         </div>
         <span class="status-badge" [class.ready]="repo.status === 'READY'" [class.failed]="repo.status === 'FAILED'">
@@ -36,20 +38,20 @@
       <div class="card-body">
         <p *ngIf="repo.gitUrl" class="git-url mono">{{ repo.gitUrl }}</p>
         <div class="meta-row">
-          <span class="meta-item"><mat-icon>description</mat-icon> {{ repo.fileCount }} files</span>
-          <span class="meta-item"><mat-icon>storage</mat-icon> {{ formatSize(repo.totalSizeBytes) }}</span>
-          <span class="meta-item"><mat-icon>alt_route</mat-icon> {{ repo.defaultBranch }}</span>
+          <span class="meta-item"><span class="meta-icon">📄</span> {{ repo.fileCount }} files</span>
+          <span class="meta-item"><span class="meta-icon">💾</span> {{ formatSize(repo.totalSizeBytes) }}</span>
+          <span class="meta-item"><span class="meta-icon">🌿</span> {{ repo.defaultBranch }}</span>
         </div>
       </div>
 
       <div class="card-footer">
-        <button mat-stroked-button color="accent" [routerLink]="['/repositories', repo.uuid, 'scan']">
-          <mat-icon>psychology</mat-icon> Scan & Chunk
+        <button class="btn-action-scan" [routerLink]="['/repositories', repo.uuid, 'scan']">
+          <span class="btn-icon">🧠</span> Scan & Chunk
         </button>
-        <button mat-icon-button color="warn" (click)="deleteRepo(repo)" title="Delete Repository">
-          <mat-icon>delete_outline</mat-icon>
+        <button class="btn-action-delete" (click)="deleteRepo(repo)" title="Delete Repository">
+          <span class="btn-icon">🗑️</span> Delete
         </button>
       </div>
-    </mat-card>
+    </div>
   </div>
 </div>

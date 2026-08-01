@@ -25,6 +25,7 @@
       font-size: 1.8rem;
       font-weight: 700;
       margin: 0 0 4px 0;
+      color: var(--text-primary);
     }
 
     .subtitle {
@@ -39,48 +40,104 @@
   }
 
   .filter-toolbar {
-    background: var(--bg-secondary);
+    background: var(--bg-card);
     border: 1px solid var(--border-color);
     border-radius: 12px;
     padding: 20px;
     margin-bottom: 24px;
 
-    .search-field {
-      width: 100%;
-      margin-bottom: 12px;
+    .search-box-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      margin-bottom: 16px;
+
+      .search-icon-prefix {
+        position: absolute;
+        left: 14px;
+        font-size: 1rem;
+        pointer-events: none;
+      }
+
+      .custom-search-input {
+        width: 100%;
+        background-color: #0f172a;
+        color: #ffffff !important;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 12px 40px 12px 42px;
+        font-size: 0.95rem;
+        outline: none;
+        transition: all 0.2s ease;
+
+        &::placeholder {
+          color: #94a3b8;
+        }
+
+        &:focus {
+          border-color: var(--accent-color);
+          box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+        }
+      }
+
+      .clear-btn {
+        position: absolute;
+        right: 12px;
+        background: transparent;
+        border: none;
+        color: #94a3b8;
+        font-size: 0.9rem;
+        cursor: pointer;
+        padding: 4px 8px;
+        border-radius: 4px;
+
+        &:hover {
+          color: #ffffff;
+          background: rgba(255, 255, 255, 0.1);
+        }
+      }
     }
 
     .language-chips {
       display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
+      flex-direction: column;
+      gap: 10px;
 
       .filter-label {
-        font-size: 0.8rem;
-        color: var(--text-secondary);
-        font-weight: 600;
+        font-size: 0.75rem;
+        color: #94a3b8;
+        font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.05em;
       }
 
-      mat-chip {
-        font-size: 0.8rem;
-        cursor: pointer;
-        background: rgba(148, 163, 184, 0.1);
-        color: var(--text-secondary);
-        border: 1px solid var(--border-color);
-        transition: all 0.2s ease;
+      .chip-set {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
 
-        &.active-chip {
-          background: rgba(56, 189, 248, 0.2) !important;
-          color: var(--accent-color) !important;
-          border-color: rgba(56, 189, 248, 0.4) !important;
-          font-weight: 600;
-        }
+        .custom-chip {
+          background: rgba(15, 23, 42, 0.6);
+          color: #cbd5e1;
+          border: 1px solid var(--border-color);
+          border-radius: 20px;
+          padding: 6px 14px;
+          font-size: 0.8rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
 
-        &:hover {
-          border-color: var(--accent-color);
+          &:hover {
+            border-color: var(--accent-color);
+            color: #ffffff;
+          }
+
+          &.active-chip {
+            background: rgba(56, 189, 248, 0.2) !important;
+            color: var(--accent-color) !important;
+            border-color: var(--accent-color) !important;
+            font-weight: 700;
+          }
         }
       }
     }
@@ -93,13 +150,14 @@
     margin-bottom: 24px;
 
     .stat-card {
-      background: var(--bg-secondary);
+      background: var(--bg-card);
       border: 1px solid var(--border-color);
+      border-radius: 10px;
       padding: 16px 20px;
 
       .stat-label {
         font-size: 0.75rem;
-        color: var(--text-secondary);
+        color: #94a3b8;
         text-transform: uppercase;
         letter-spacing: 0.05em;
         display: block;
@@ -109,7 +167,7 @@
       .stat-value {
         font-size: 1.8rem;
         font-weight: 700;
-        color: var(--text-primary);
+        color: #ffffff;
 
         &.text-accent {
           color: var(--accent-color);
@@ -129,15 +187,13 @@
   .empty-state {
     text-align: center;
     padding: 60px 20px;
-    background: var(--bg-secondary);
+    background: var(--bg-card);
     border: 1px dashed var(--border-color);
     border-radius: 12px;
 
     .empty-icon {
-      font-size: 56px;
-      width: 56px;
-      height: 56px;
-      color: var(--accent-color);
+      font-size: 48px;
+      display: block;
       margin-bottom: 12px;
     }
 
@@ -160,7 +216,7 @@
     margin-bottom: 24px;
 
     .chunk-card {
-      background: var(--bg-secondary);
+      background: var(--bg-card);
       border: 1px solid var(--border-color);
       border-radius: 10px;
       overflow: hidden;
@@ -170,7 +226,7 @@
         justify-content: space-between;
         align-items: center;
         padding: 12px 16px;
-        background: rgba(15, 23, 42, 0.6);
+        background: rgba(15, 23, 42, 0.8);
         border-bottom: 1px solid var(--border-color);
 
         .file-meta {
@@ -181,19 +237,23 @@
           .file-path {
             font-size: 0.85rem;
             font-weight: 600;
+            color: #f8fafc;
           }
 
-          .lang-chip {
+          .lang-badge {
             font-size: 0.7rem;
-            height: 22px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 4px;
             background: rgba(56, 189, 248, 0.15);
             color: var(--accent-color);
+            border: 1px solid rgba(56, 189, 248, 0.3);
           }
         }
 
         .chunk-range {
           font-size: 0.75rem;
-          color: var(--text-secondary);
+          color: #94a3b8;
         }
       }
 
@@ -206,7 +266,7 @@
           font-family: var(--font-mono);
           font-size: 0.82rem;
           color: #e2e8f0;
-          line-height: 1.5;
+          line-height: 1.55;
           white-space: pre-wrap;
           word-break: break-word;
         }
@@ -215,7 +275,7 @@
   }
 
   .paginator {
-    background: var(--bg-secondary) !important;
+    background: var(--bg-card) !important;
     color: var(--text-primary) !important;
     border: 1px solid var(--border-color);
     border-radius: 8px;

@@ -1,6 +1,6 @@
 .repos-container {
   max-width: 1080px;
-  margin: 32px auto;
+  margin: 40px auto;
   padding: 0 20px;
 
   .repos-header {
@@ -13,12 +13,27 @@
       font-size: 1.8rem;
       font-weight: 700;
       margin: 0 0 4px 0;
+      color: var(--text-primary);
     }
 
-    p {
+    .subtitle {
       color: var(--text-secondary);
       font-size: 0.95rem;
       margin: 0;
+    }
+
+    .btn-primary-header {
+      background: var(--accent-color);
+      color: #0f172a;
+      font-weight: 600;
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+
+      &:hover {
+        background: var(--accent-hover);
+        color: #ffffff;
+      }
     }
   }
 
@@ -38,10 +53,8 @@
     border-radius: 12px;
 
     .empty-icon {
-      font-size: 56px;
-      width: 56px;
-      height: 56px;
-      color: var(--text-secondary);
+      font-size: 48px;
+      display: block;
       margin-bottom: 12px;
     }
 
@@ -52,7 +65,7 @@
 
     p {
       color: var(--text-secondary);
-      max-width: 460px;
+      max-width: 440px;
       margin: 0 auto 20px auto;
     }
   }
@@ -63,13 +76,20 @@
     gap: 20px;
 
     .repo-card {
-      background: var(--bg-secondary);
+      background: var(--bg-card);
       border: 1px solid var(--border-color);
-      border-radius: 10px;
+      border-radius: 12px;
       padding: 20px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+
+      &:hover {
+        border-color: var(--accent-color);
+        transform: translateY(-2px);
+      }
 
       .card-header {
         display: flex;
@@ -80,43 +100,51 @@
         .repo-title {
           display: flex;
           align-items: center;
-          gap: 8px;
-          font-weight: 600;
-          font-size: 1.1rem;
+          gap: 10px;
 
-          mat-icon {
-            color: var(--accent-color);
+          .type-icon {
+            font-size: 1.2rem;
+          }
+
+          .name {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--text-primary);
           }
         }
 
         .status-badge {
-          font-size: 0.75rem;
-          padding: 2px 8px;
-          border-radius: 4px;
-          font-weight: 600;
+          font-size: 0.7rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          padding: 4px 10px;
+          border-radius: 20px;
           background: rgba(148, 163, 184, 0.15);
           color: var(--text-secondary);
 
           &.ready {
-            background: rgba(16, 185, 129, 0.15);
-            color: #34d399;
+            background: rgba(34, 197, 94, 0.15);
+            color: #4ade80;
+            border: 1px solid rgba(34, 197, 94, 0.3);
           }
 
           &.failed {
             background: rgba(239, 68, 68, 0.15);
             color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
           }
         }
       }
 
       .card-body {
-        margin-bottom: 16px;
+        margin-bottom: 20px;
 
         .git-url {
           font-size: 0.8rem;
           color: var(--text-secondary);
+          margin: 0 0 12px 0;
           word-break: break-all;
-          margin-bottom: 12px;
         }
 
         .meta-row {
@@ -125,16 +153,18 @@
           gap: 12px;
 
           .meta-item {
-            display: flex;
-            align-items: center;
-            gap: 4px;
             font-size: 0.8rem;
-            color: var(--text-secondary);
+            color: #cbd5e1;
+            background: rgba(15, 23, 42, 0.4);
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
 
-            mat-icon {
-              font-size: 16px;
-              width: 16px;
-              height: 16px;
+            .meta-icon {
+              font-size: 0.85rem;
             }
           }
         }
@@ -144,15 +174,47 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        border-top: 1px solid rgba(51, 65, 85, 0.5);
-        padding-top: 12px;
+        padding-top: 14px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
 
-        .owner-chip {
-          font-size: 0.75rem;
-          background: rgba(56, 189, 248, 0.1);
+        .btn-action-scan {
+          background: rgba(56, 189, 248, 0.12);
           color: var(--accent-color);
-          padding: 2px 8px;
-          border-radius: 4px;
+          border: 1px solid rgba(56, 189, 248, 0.3);
+          border-radius: 6px;
+          padding: 8px 16px;
+          font-weight: 600;
+          font-size: 0.85rem;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          transition: all 0.2s ease;
+
+          &:hover {
+            background: var(--accent-color);
+            color: #0f172a;
+          }
+        }
+
+        .btn-action-delete {
+          background: rgba(239, 68, 68, 0.1);
+          color: #f87171;
+          border: 1px solid rgba(239, 68, 68, 0.3);
+          border-radius: 6px;
+          padding: 8px 14px;
+          font-weight: 600;
+          font-size: 0.85rem;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          transition: all 0.2s ease;
+
+          &:hover {
+            background: rgba(239, 68, 68, 0.25);
+            color: #ffffff;
+          }
         }
       }
     }

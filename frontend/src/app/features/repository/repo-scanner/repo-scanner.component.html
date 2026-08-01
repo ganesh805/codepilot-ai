@@ -1,0 +1,70 @@
+<div class="scanner-container">
+  <div class="scanner-header">
+    <div>
+      <a routerLink="/repositories" class="back-link">← Back to Repositories</a>
+      <h1>Code Chunking & AST Scanner Engine</h1>
+      <p class="subtitle" *ngIf="stats">Repository: <strong class="accent-text">{{ stats.repoName }}</strong></p>
+    </div>
+    <button mat-flat-button color="primary" (click)="triggerScan()" [disabled]="scanning">
+      <mat-spinner diameter="20" *ngIf="scanning"></mat-spinner>
+      <mat-icon *ngIf="!scanning">psychology</mat-icon>
+      <span *ngIf="!scanning">Re-Scan & Generate Chunks</span>
+    </button>
+  </div>
+
+  <!-- Stats Grid -->
+  <div *ngIf="stats" class="stats-grid">
+    <mat-card class="stat-card">
+      <span class="stat-label">Total Code Chunks</span>
+      <span class="stat-value">{{ stats.totalChunks }}</span>
+    </mat-card>
+    <mat-card class="stat-card">
+      <span class="stat-label">Detected Languages</span>
+      <div class="chip-container">
+        <mat-chip *ngFor="let lang of getLanguageKeys()">
+          {{ lang }}: {{ stats.languageBreakdown[lang] }}
+        </mat-chip>
+      </div>
+    </mat-card>
+  </div>
+
+  <div *ngIf="loading" class="loading-state">
+    <mat-spinner diameter="36"></mat-spinner>
+    <p>Loading code chunks...</p>
+  </div>
+
+  <div *ngIf="!loading && chunks.length === 0" class="empty-state">
+    <mat-icon class="empty-icon">memory</mat-icon>
+    <h3>No Code Chunks Generated Yet</h3>
+    <p>Run the AST Scanner Engine to tokenize code files into overlapping semantic chunks.</p>
+    <button mat-flat-button color="primary" (click)="triggerScan()">Run Scanner Engine</button>
+  </div>
+
+  <!-- Chunk List -->
+  <div *ngIf="!loading && chunks.length > 0" class="chunk-section">
+    <div class="chunk-list">
+      <mat-card *ngFor="let chunk of pagedChunks" class="chunk-card">
+        <div class="chunk-header">
+          <div class="file-meta">
+            <span class="file-path mono">{{ chunk.filePath }}</span>
+            <mat-chip class="lang-chip">{{ chunk.language }}</mat-chip>
+          </div>
+          <div class="chunk-range mono">
+            Lines {{ chunk.startLine }} - {{ chunk.endLine }} ({{ chunk.tokenCount }} tokens)
+          </div>
+        </div>
+        <div class="chunk-body">
+          <pre><code>{{ chunk.content }}</code></pre>
+        </div>
+      </mat-card>
+    </div>
+
+    <mat-paginator
+      [length]="chunks.length"
+      [pageSize]="pageSize"
+      [pageSizeOptions]="[5, 10, 25, 50]"
+      (page)="onPageChange($event)"
+      class="paginator">
+    </mat-paginator>
+  </div>
+</div>

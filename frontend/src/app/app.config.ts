@@ -8,6 +8,7 @@ import { RegisterComponent } from './features/auth/register/register.component';
 import { AdminPanelComponent } from './features/admin/admin-panel/admin-panel.component';
 import { RepoListComponent } from './features/repository/repo-list/repo-list.component';
 import { RepoImportComponent } from './features/repository/repo-import/repo-import.component';
+import { RepoScannerComponent } from './features/repository/repo-scanner/repo-scanner.component';
 import { authGuard } from './core/guards/auth.guard';
 import { roleGuard } from './core/guards/role.guard';
 
@@ -17,6 +18,7 @@ const routes: Routes = [
   { path: 'admin', component: AdminPanelComponent, canActivate: [roleGuard(['ROLE_ADMIN'])] },
   { path: 'repositories', component: RepoListComponent, canActivate: [authGuard] },
   { path: 'repositories/import', component: RepoImportComponent, canActivate: [authGuard] },
+  { path: 'repositories/:uuid/scan', component: RepoScannerComponent, canActivate: [authGuard] },
   { path: '', redirectTo: 'repositories', pathMatch: 'full' }
 ];
 

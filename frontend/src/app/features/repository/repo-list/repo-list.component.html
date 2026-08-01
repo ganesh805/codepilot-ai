@@ -43,7 +43,9 @@
       </div>
 
       <div class="card-footer">
-        <span class="owner-chip">{{ repo.owner }}</span>
+        <button mat-stroked-button color="accent" [routerLink]="['/repositories', repo.uuid, 'scan']">
+          <mat-icon>psychology</mat-icon> Scan & Chunk
+        </button>
         <button mat-icon-button color="warn" (click)="deleteRepo(repo)" title="Delete Repository">
           <mat-icon>delete_outline</mat-icon>
         </button>

@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  codepilot-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: codepilot-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=h2
+    restart: always
+
+  codepilot-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: codepilot-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - codepilot-backend
+    restart: always
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: codepilot-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    restart: always
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: codepilot-grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    restart: always

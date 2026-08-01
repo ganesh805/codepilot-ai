@@ -11,6 +11,7 @@ import { RepoImportComponent } from './features/repository/repo-import/repo-impo
 import { RepoScannerComponent } from './features/repository/repo-scanner/repo-scanner.component';
 import { RepoEmbeddingComponent } from './features/repository/repo-embedding/repo-embedding.component';
 import { RepoSearchComponent } from './features/repository/repo-search/repo-search.component';
+import { RepoChatComponent } from './features/repository/repo-chat/repo-chat.component';
 import { authGuard } from './core/guards/auth.guard';
 import { roleGuard } from './core/guards/role.guard';
 
@@ -23,6 +24,7 @@ const routes: Routes = [
   { path: 'repositories/:uuid/scan', component: RepoScannerComponent, canActivate: [authGuard] },
   { path: 'repositories/:uuid/embedding', component: RepoEmbeddingComponent, canActivate: [authGuard] },
   { path: 'repositories/:uuid/search', component: RepoSearchComponent, canActivate: [authGuard] },
+  { path: 'repositories/:uuid/chat', component: RepoChatComponent, canActivate: [authGuard] },
   { path: '', redirectTo: 'repositories', pathMatch: 'full' }
 ];
 

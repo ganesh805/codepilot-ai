@@ -1,0 +1,80 @@
+<div class="chat-page-container">
+  <div class="chat-header">
+    <div>
+      <a [routerLink]="['/repositories', repoUuid, 'scan']" class="back-link">← Back to Repository</a>
+      <h1>🤖 AI CodePilot Assistant (RAG Chat)</h1>
+      <p class="subtitle">Ask questions about codebase architecture, functions, endpoints, or implementation details.</p>
+    </div>
+  </div>
+
+  <div class="chat-card">
+    <!-- Messages Scroll Window -->
+    <div class="messages-container" #scrollContainer>
+      <div *ngFor="let msg of messages" class="message-row" [class.user-row]="msg.sender === 'USER'">
+        <div class="avatar">
+          <span>{{ msg.sender === 'USER' ? '👤' : '⚡' }}</span>
+        </div>
+        <div class="bubble-wrapper">
+          <div class="bubble" [class.user-bubble]="msg.sender === 'USER'" [class.assistant-bubble]="msg.sender === 'ASSISTANT'">
+            <div class="message-text">
+              <pre><code>{{ msg.text }}</code></pre>
+            </div>
+            <span class="timestamp">{{ msg.timestamp | date:'shortTime' }}</span>
+          </div>
+
+          <!-- Citations Drawer -->
+          <div *ngIf="msg.citations && msg.citations.length > 0" class="citations-box">
+            <button type="button" class="btn-toggle-citations" (click)="toggleCitations(msg.id)">
+              📎 {{ showCitations[msg.id] ? 'Hide' : 'Show' }} Retained Code Citations ({{ msg.citations.length }})
+            </button>
+
+            <div *ngIf="showCitations[msg.id]" class="citations-list">
+              <div *ngFor="let cite of msg.citations" class="citation-card">
+                <div class="cite-meta">
+                  <span class="file-path mono">{{ cite.filePath }}</span>
+                  <span class="cite-lines mono">Lines {{ cite.startLine }} - {{ cite.endLine }}</span>
+                </div>
+                <div class="cite-code">
+                  <pre><code>{{ cite.content }}</code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div *ngIf="loading" class="message-row assistant-row">
+        <div class="avatar">⚡</div>
+        <div class="bubble assistant-bubble loading-bubble">
+          <mat-spinner diameter="20"></mat-spinner>
+          <span>Analyzing RAG context & synthesizing response...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Suggested Questions Chips -->
+    <div class="suggested-box" *ngIf="messages.length <= 2">
+      <span class="suggested-title">Suggested Developer Questions:</span>
+      <div class="suggested-chips">
+        <button type="button" *ngFor="let q of suggestedQuestions" class="suggested-chip" (click)="sendSuggestedQuestion(q)">
+          💬 {{ q }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Input Bar -->
+    <div class="input-toolbar">
+      <input 
+        type="text" 
+        class="custom-chat-input" 
+        [(ngModel)]="inputMessage" 
+        (keyup.enter)="sendMessage()"
+        placeholder="Ask anything about this repository codebase..."
+        [disabled]="loading"
+      />
+      <button class="btn-primary btn-send" (click)="sendMessage()" [disabled]="!inputMessage || loading">
+        <span>Send</span> ➔
+      </button>
+    </div>
+  </div>
+</div>

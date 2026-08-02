@@ -49,36 +49,44 @@ public class SqlQueryOptimizerEngine {
 
         List<String> antiPatterns = new ArrayList<>();
         List<String> indexList = new ArrayList<>();
-        int estimatedGain = 40;
+        int estimatedGain = 45;
 
         String tableName = extractTableName(rawSql);
+        String rawUpper = rawSql.toUpperCase();
 
-        // 1. Check SELECT * Wildcard
-        if (rawSql.toUpperCase().contains("SELECT *")) {
-            antiPatterns.add("⚠️ WILDCARD COLUMN SELECTION: `SELECT *` retrieves unnecessary columns over the network and prevents index-only scans.");
+        // 1. Detect WILDCARD COLUMN SELECTION (SELECT *)
+        if (rawUpper.contains("SELECT *")) {
+            antiPatterns.add("⚠️ WILDCARD COLUMN SELECTION: `SELECT *` transfers unnecessary LOB/Text payload over network and prevents B-Tree Index-Only Covering Scans.");
             estimatedGain += 20;
         }
 
-        // 2. Check LIKE '%term%' Leading Wildcard
-        if (rawSql.toUpperCase().contains("LIKE '%")) {
-            antiPatterns.add("🚨 FULL TABLE SCAN: Leading wildcard `LIKE '%term%'` prevents B-Tree index lookup and forces full table scans.");
+        // 2. Detect LEADING WILDCARD LIKE '%term%'
+        if (rawUpper.contains("LIKE '%")) {
+            antiPatterns.add("🚨 FULL TABLE SCAN: Leading wildcard `LIKE '%term%'` prevents B-Tree index traversal and forces an O(N) sequential table scan.");
             estimatedGain += 25;
         }
 
-        // 3. Check WHERE & JOIN Index Recommendations
+        // 3. Detect Missing Pagination LIMIT
+        if (!rawUpper.contains("LIMIT") && !rawUpper.contains("TOP") && !rawUpper.contains("ROWNUM")) {
+            antiPatterns.add("⚠️ UNBOUNDED RESULT SET: Missing `LIMIT` clause may consume excessive database buffer pool memory and cause JVM Heap OutOfMemoryError.");
+            estimatedGain += 10;
+        }
+
+        // 4. Detect Unindexed WHERE & JOIN foreign keys
         Matcher whereMatcher = WHERE_COL_PATTERN.matcher(rawSql);
         if (whereMatcher.find()) {
-            String col = whereMatcher.group(1).replace(tableName + ".", "");
+            String col = whereMatcher.group(1).replace(tableName + ".", "").replaceAll("[^a-zA-Z0-9_]", "");
             indexList.add(String.format("CREATE INDEX idx_%s_%s ON %s(%s);", tableName, col, tableName, col));
-            antiPatterns.add(String.format("💡 MISSING INDEX: Column `%s` in WHERE clause requires a B-Tree Composite Index.", col));
+            antiPatterns.add(String.format("💡 MISSING INDEX: Filtering column `%s` requires a dedicated B-Tree Index.", col));
             estimatedGain += 15;
         }
 
         Matcher joinMatcher = JOIN_COL_PATTERN.matcher(rawSql);
         if (joinMatcher.find()) {
             String joinTable = joinMatcher.group(1);
-            String joinCol = joinMatcher.group(3).replace(joinTable + ".", "");
+            String joinCol = joinMatcher.group(3).replace(joinTable + ".", "").replaceAll("[^a-zA-Z0-9_]", "");
             indexList.add(String.format("CREATE INDEX idx_%s_%s ON %s(%s);", joinTable, joinCol, joinTable, joinCol));
+            antiPatterns.add(String.format("💡 MISSING FOREIGN KEY INDEX: Joined table `%s` on `%s` requires an index to avoid Nested Loop Full Table Scans.", joinTable, joinCol));
         }
 
         if (indexList.isEmpty()) {
@@ -139,14 +147,14 @@ public class SqlQueryOptimizerEngine {
             opt = opt.replace("LIKE '%", "LIKE '");
         }
         if (!opt.toUpperCase().contains("LIMIT") && !opt.toUpperCase().contains("JOIN FETCH")) {
-            opt = opt + "\nLIMIT 100;";
+            opt = opt + "\nLIMIT 100 OFFSET 0;";
         }
         return opt;
     }
 
     private String generateAnalysisSummary(String table, int gain, List<String> antiPatterns, List<String> indexList) {
         StringBuilder sb = new StringBuilder();
-        sb.append(String.format("### EXPLAIN Query Analysis Report: Table `%s`\n\n", table));
+        sb.append(String.format("### EXPLAIN Execution Plan Report: Table `%s`\n\n", table));
         sb.append(String.format("- **Estimated Performance Gain**: `+%d%% Faster Execution`\n", gain));
         sb.append(String.format("- **Detected Anti-Patterns**: `%d Query Code Smells`\n\n", antiPatterns.size()));
 
@@ -155,8 +163,8 @@ public class SqlQueryOptimizerEngine {
             sb.append(String.format("- %s\n", pattern));
         }
 
-        sb.append("\n#### EXPLAIN Plan Recommendation:\n");
-        sb.append("Apply the suggested B-Tree DDL indexes to reduce EXPLAIN plan scan rows from `ALL` (Full Table Scan) to `ref`/`range` lookup.\n");
+        sb.append("\n#### Database Administrator Recommendation:\n");
+        sb.append("Apply the composite B-Tree DDL indexes below to reduce EXPLAIN plan scan rows from `ALL` (Full Table Scan) to `ref`/`range` index lookup.\n");
 
         return sb.toString();
     }

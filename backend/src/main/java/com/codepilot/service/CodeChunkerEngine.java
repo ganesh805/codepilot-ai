@@ -45,7 +45,7 @@ public class CodeChunkerEngine {
 
     /**
      * Language-Aware Structural Code Splitter.
-     * Preserves exact multi-line formatting, indentation, and newlines.
+     * Preserves 100% clean raw source code, original newlines (\n), tabs (\t), and indentation.
      */
     public List<CodeChunk> chunkFile(CodeRepository repository, String relativePath, String fileName, List<String> fileLines) {
         List<CodeChunk> chunks = new ArrayList<>();
@@ -55,9 +55,6 @@ public class CodeChunkerEngine {
 
         String language = detectLanguage(fileName);
         int totalLines = fileLines.size();
-
-        // Build multi-line structural header preserving clean \n formatting
-        String headerContext = extractHeaderContext(relativePath, fileName, fileLines);
 
         int startLine = 1;
         int chunkIndex = 0;
@@ -69,13 +66,12 @@ public class CodeChunkerEngine {
             endLine = adjustToLanguageBoundary(fileLines, startLine, endLine, totalLines, language);
 
             List<String> chunkLines = fileLines.subList(startLine - 1, endLine);
-            String rawBody = String.join("\n", chunkLines);
+            
+            // Clean, raw source code with untouched vertical line breaks (\n) and tabs (\t)
+            String rawCodeContent = String.join("\n", chunkLines);
 
-            // Combine header context and code body preserving exact newlines (\n)
-            String chunkContent = headerContext.isEmpty() ? rawBody : headerContext + "\n" + rawBody;
-
-            if (!chunkContent.trim().isEmpty()) {
-                int tokenCount = estimateTokenCount(chunkContent);
+            if (!rawCodeContent.trim().isEmpty()) {
+                int tokenCount = estimateTokenCount(rawCodeContent);
 
                 CodeChunk chunk = CodeChunk.builder()
                         .repository(repository)
@@ -86,7 +82,7 @@ public class CodeChunkerEngine {
                         .startLine(startLine)
                         .endLine(endLine)
                         .tokenCount(tokenCount)
-                        .content(chunkContent)
+                        .content(rawCodeContent)
                         .build();
 
                 chunks.add(chunk);
@@ -103,30 +99,6 @@ public class CodeChunkerEngine {
     }
 
     /**
-     * Preserves multi-line structure for package, class header, and Spring Security annotations.
-     */
-    private String extractHeaderContext(String relativePath, String fileName, List<String> lines) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("/* Context Metadata:\n");
-        sb.append(" * File: ").append(relativePath).append("\n");
-
-        boolean hasMetadata = false;
-        for (int i = 0; i < Math.min(25, lines.size()); i++) {
-            String line = lines.get(i).trim();
-            if (line.startsWith("package ") || line.startsWith("@Configuration") 
-                    || line.startsWith("@EnableWebSecurity") || line.startsWith("@EnableGlobalMethodSecurity")
-                    || line.startsWith("@EnableMethodSecurity") || line.startsWith("public class ") 
-                    || line.startsWith("public interface ")) {
-                sb.append(" * ").append(line).append("\n");
-                hasMetadata = true;
-            }
-        }
-        sb.append(" */");
-
-        return hasMetadata ? sb.toString() : "";
-    }
-
-    /**
      * Language-Aware Boundary Adjuster: Looks for class, method, or annotation boundaries.
      */
     private int adjustToLanguageBoundary(List<String> lines, int startLine, int targetEnd, int maxLines, String language) {
@@ -140,7 +112,7 @@ public class CodeChunkerEngine {
             if (line.endsWith("}") || line.startsWith("public ") || line.startsWith("private ") 
                     || line.startsWith("protected ") || line.startsWith("@PreAuthorize") 
                     || line.startsWith("@Secured") || line.startsWith("@RolesAllowed") 
-                    || line.startsWith("@Bean")) {
+                    || line.startsWith("@Bean") || line.startsWith("import ")) {
                 return i;
             }
         }

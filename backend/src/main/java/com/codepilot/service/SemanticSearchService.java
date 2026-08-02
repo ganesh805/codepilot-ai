@@ -52,9 +52,10 @@ public class SemanticSearchService {
         boolean isSecurityRbacQuery = queryLower.contains("role") || queryLower.contains("rbac") || queryLower.contains("security") || queryLower.contains("access control") || queryLower.contains("auth") || queryLower.contains("permission");
 
         for (CodeChunk chunk : chunks) {
-            float[] chunkVector = embeddingEngine.generateEmbedding(chunk.getContent());
+            String cleanDisplayContent = sanitizeDisplayContent(chunk.getContent());
+            float[] chunkVector = embeddingEngine.generateEmbedding(cleanDisplayContent);
             double score = calculateCosineSimilarity(queryVector, chunkVector);
-            String contentLower = chunk.getContent().toLowerCase();
+            String contentLower = cleanDisplayContent.toLowerCase();
             String pathLower = chunk.getFilePath().toLowerCase();
 
             // 1. Exact string keyword match boost
@@ -82,7 +83,7 @@ public class SemanticSearchService {
                     .endLine(chunk.getEndLine())
                     .tokenCount(chunk.getTokenCount())
                     .similarityScore(Math.round(score * 1000.0) / 1000.0)
-                    .content(chunk.getContent())
+                    .content(cleanDisplayContent)
                     .build();
 
             results.add(result);
@@ -95,6 +96,27 @@ public class SemanticSearchService {
         log.info("Semantic search for query '{}' returned top {} results out of {} chunks", request.getQuery(), limit, chunks.size());
 
         return results.subList(0, limit);
+    }
+
+    /**
+     * Strips any internal metadata prefixes from display payload so UI renders 100% clean raw source code.
+     */
+    private String sanitizeDisplayContent(String content) {
+        if (content == null) return "";
+        String cleaned = content;
+        if (cleaned.startsWith("/* Context Metadata:")) {
+            int endIdx = cleaned.indexOf("*/");
+            if (endIdx != -1) {
+                cleaned = cleaned.substring(endIdx + 2).trim();
+            }
+        }
+        if (cleaned.startsWith("// Context:")) {
+            int newlineIdx = cleaned.indexOf("\n");
+            if (newlineIdx != -1) {
+                cleaned = cleaned.substring(newlineIdx + 1).trim();
+            }
+        }
+        return cleaned;
     }
 
     private double calculateCosineSimilarity(float[] vectorA, float[] vectorB) {

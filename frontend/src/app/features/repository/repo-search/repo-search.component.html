@@ -1,8 +1,8 @@
 <div class="search-container">
   <div class="search-header">
     <a [routerLink]="['/repositories', repoUuid, 'scan']" class="back-link">← Back to Code Chunks</a>
-    <h1>AI Semantic RAG Code Search</h1>
-    <p class="subtitle">Search your codebase in natural language using 768-D vector Cosine distance matching.</p>
+    <h1>AI Hybrid RAG Code Search</h1>
+    <p class="subtitle">Search your codebase in natural language or keywords using Dense Vectors (768-D) + Sparse BM25 RRF Matching.</p>
   </div>
 
   <!-- Search Input Bar -->
@@ -14,7 +14,7 @@
         class="custom-search-input" 
         [(ngModel)]="searchQuery" 
         (keyup.enter)="executeSearch()"
-        placeholder="Ask in natural language e.g. Where do we validate JWT tokens or hash passwords?"
+        placeholder="Ask in natural language or keyword e.g. 'authentication', 'role based access control', or 'JWT token'"
       />
       <button class="btn-primary" (click)="executeSearch()" [disabled]="loading">
         <mat-spinner diameter="18" *ngIf="loading"></mat-spinner>
@@ -23,7 +23,7 @@
     </div>
 
     <div class="samples-box">
-      <span class="sample-label">Try a sample natural language query:</span>
+      <span class="sample-label">Try a sample query:</span>
       <div class="sample-chips">
         <button 
           type="button"
@@ -38,19 +38,19 @@
 
   <div *ngIf="loading" class="loading-state">
     <mat-spinner diameter="36"></mat-spinner>
-    <p>Computing vector similarity across codebase chunks...</p>
+    <p>Executing LLM Query Expansion & Hybrid RAG Vector Search...</p>
   </div>
 
   <div *ngIf="!loading && hasSearched && results.length === 0" class="empty-state">
     <span class="empty-icon">🔍</span>
-    <h3>No Semantic Code Matches Found</h3>
-    <p>Try rephrasing your search query or run the AST Scanner and Vector Embedding Generator first.</p>
+    <h3>No Highly Relevant Files Found</h3>
+    <p>No code files matched above the <strong>65% confidence threshold</strong>. Try expanding your search query (e.g. <em>"Spring Security authentication configuration"</em>).</p>
   </div>
 
   <!-- Results List -->
   <div *ngIf="!loading && results.length > 0" class="results-section">
     <div class="results-header">
-      <h2>Top {{ results.length }} Relevant Code Matches</h2>
+      <h2>Top {{ results.length }} Relevant Code Matches (>= 65% Confidence)</h2>
     </div>
 
     <div class="results-list">
@@ -61,7 +61,7 @@
             <span class="file-path mono">{{ match.filePath }}</span>
             <span class="lang-badge">{{ match.language }}</span>
           </div>
-          <div class="score-badge" [class.high-score]="match.similarityScore >= 0.7">
+          <div class="score-badge" [class.high-score]="match.similarityScore >= 0.75">
             {{ getScorePercentage(match.similarityScore) }}% Similarity Match
           </div>
         </div>

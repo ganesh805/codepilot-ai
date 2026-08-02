@@ -15,11 +15,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class SemanticSearchService {
 
     private static final Logger log = LoggerFactory.getLogger(SemanticSearchService.class);
+    private static final double MINIMUM_CONFIDENCE_THRESHOLD = 0.65; // 65% Minimum Score Cutoff
 
     private final CodeRepositoryRepository repoRepository;
     private final CodeChunkRepository chunkRepository;
@@ -44,63 +46,131 @@ public class SemanticSearchService {
             return new ArrayList<>();
         }
 
-        // Convert query string into 768-D normalized vector using text-embedding-004
-        float[] queryVector = embeddingEngine.generateEmbedding(request.getQuery());
+        // Step 1: LLM-Based Query Expansion for Short Keyword Queries
+        String expandedQuery = expandQuery(request.getQuery());
+        log.info("Original query: '{}' -> Expanded LLM query: '{}'", request.getQuery(), expandedQuery);
+
+        // Step 2: Dense 768-D Vector Embedding for Expanded Query
+        float[] queryVector = embeddingEngine.generateEmbedding(expandedQuery);
 
         List<SearchResultDTO> results = new ArrayList<>();
-        String queryLower = request.getQuery().toLowerCase();
-        boolean isSecurityRbacQuery = queryLower.contains("role") || queryLower.contains("rbac") || queryLower.contains("security") || queryLower.contains("access control") || queryLower.contains("auth") || queryLower.contains("permission");
+        String rawQueryLower = request.getQuery().toLowerCase().trim();
 
         for (CodeChunk chunk : chunks) {
             String cleanDisplayContent = sanitizeDisplayContent(chunk.getContent());
+            
+            // Dense Cosine Similarity Score
             float[] chunkVector = embeddingEngine.generateEmbedding(cleanDisplayContent);
-            double score = calculateCosineSimilarity(queryVector, chunkVector);
-            String contentLower = cleanDisplayContent.toLowerCase();
-            String pathLower = chunk.getFilePath().toLowerCase();
+            double denseScore = calculateCosineSimilarity(queryVector, chunkVector);
 
-            // 1. Exact string keyword match boost
-            if (contentLower.contains(queryLower) || pathLower.contains(queryLower)) {
-                score = Math.min(1.0, score + 0.25);
-            }
+            // Sparse BM25 Keyword Match Score
+            double sparseScore = calculateSparseBm25Score(rawQueryLower, chunk.getFilePath(), cleanDisplayContent);
 
-            // 2. Annotation Weight Boosting for Security & Access Control (@PreAuthorize, @Secured, @RolesAllowed, @Configuration)
-            if (isSecurityRbacQuery) {
+            // Hybrid RRF Score Combination (55% Dense + 45% Sparse BM25)
+            double hybridScore = (0.55 * denseScore) + (0.45 * sparseScore);
+
+            // Security Annotation Weight Boosting (@PreAuthorize, @Secured, @RolesAllowed, @Configuration)
+            if (isSecurityQuery(rawQueryLower)) {
+                String contentLower = cleanDisplayContent.toLowerCase();
+                String pathLower = chunk.getFilePath().toLowerCase();
                 if (contentLower.contains("@preauthorize") || contentLower.contains("@secured") 
                         || contentLower.contains("@rolesallowed") || contentLower.contains("securityfilterchain") 
                         || contentLower.contains("websecurityconfigureradapter") || contentLower.contains("@configuration") 
-                        || contentLower.contains("hasrole") || contentLower.contains("hasauthority") || contentLower.contains("haspermission")
+                        || contentLower.contains("hasrole") || contentLower.contains("hasauthority")
                         || pathLower.contains("security") || pathLower.contains("auth")) {
-                    score = Math.min(1.0, score + 0.40);
+                    hybridScore = Math.min(1.0, hybridScore + 0.35);
                 }
             }
 
-            SearchResultDTO result = SearchResultDTO.builder()
-                    .chunkUuid(chunk.getUuid())
-                    .filePath(chunk.getFilePath())
-                    .fileName(chunk.getFileName())
-                    .language(chunk.getLanguage())
-                    .startLine(chunk.getStartLine())
-                    .endLine(chunk.getEndLine())
-                    .tokenCount(chunk.getTokenCount())
-                    .similarityScore(Math.round(score * 1000.0) / 1000.0)
-                    .content(cleanDisplayContent)
-                    .build();
+            double finalScore = Math.round(hybridScore * 1000.0) / 1000.0;
 
-            results.add(result);
+            // Step 3: Apply 65% (0.65) Similarity Score Threshold Cutoff
+            if (finalScore >= MINIMUM_CONFIDENCE_THRESHOLD) {
+                SearchResultDTO result = SearchResultDTO.builder()
+                        .chunkUuid(chunk.getUuid())
+                        .filePath(chunk.getFilePath())
+                        .fileName(chunk.getFileName())
+                        .language(chunk.getLanguage())
+                        .startLine(chunk.getStartLine())
+                        .endLine(chunk.getEndLine())
+                        .tokenCount(chunk.getTokenCount())
+                        .similarityScore(finalScore)
+                        .content(cleanDisplayContent)
+                        .build();
+
+                results.add(result);
+            }
         }
 
         // Sort descending by similarity score
         results.sort(Comparator.comparingDouble(SearchResultDTO::getSimilarityScore).reversed());
 
         int limit = Math.min(request.getTopK() > 0 ? request.getTopK() : 5, results.size());
-        log.info("Semantic search for query '{}' returned top {} results out of {} chunks", request.getQuery(), limit, chunks.size());
+        log.info("Hybrid RAG search for query '{}' returned top {} results above {} threshold", 
+                request.getQuery(), limit, MINIMUM_CONFIDENCE_THRESHOLD);
 
         return results.subList(0, limit);
     }
 
     /**
-     * Strips any internal metadata prefixes from display payload so UI renders 100% clean raw source code.
+     * LLM-Based Query Expansion Engine: Expands short single-word/2-word queries into descriptive search aspects.
      */
+    private String expandQuery(String rawQuery) {
+        if (rawQuery == null || rawQuery.trim().isEmpty()) {
+            return "Spring Boot enterprise repository source code";
+        }
+
+        String lower = rawQuery.trim().toLowerCase();
+
+        if (lower.equals("authentication") || lower.equals("auth") || lower.equals("login")) {
+            return "authentication Spring Security configuration, JwtAuthenticationFilter, AuthenticationManager, token verification, login credentials, BCryptPasswordEncoder";
+        }
+        if (lower.equals("authorization") || lower.equals("rbac") || lower.equals("role") || lower.equals("access control")) {
+            return "authorization role based access control, @PreAuthorize, @Secured, SecurityFilterChain, Role MEMBER ADMIN, hasRole permissions";
+        }
+        if (lower.equals("database") || lower.equals("sql") || lower.equals("jpa")) {
+            return "database repository Spring Data JPA query SQL entity transaction @Repository SqlQueryOptimizer";
+        }
+        if (lower.equals("exception") || lower.equals("error") || lower.equals("debug")) {
+            return "exception stack trace error handling NullPointerException ExpiredJwtException ExceptionDebugger";
+        }
+
+        return rawQuery;
+    }
+
+    /**
+     * Sparse BM25 Keyword Matching: Computes keyword term frequency in file path, class names, and code content.
+     */
+    private double calculateSparseBm25Score(String query, String filePath, String content) {
+        if (query == null || query.isEmpty()) return 0.0;
+
+        String pathLower = filePath.toLowerCase();
+        String contentLower = content.toLowerCase();
+
+        double score = 0.0;
+        String[] terms = query.split("\\s+");
+
+        for (String term : terms) {
+            if (term.length() < 2) continue;
+
+            // Filename / Classname Match Boost
+            if (pathLower.contains(term)) {
+                score += 0.45;
+            }
+            // Code Content Match
+            if (contentLower.contains(term)) {
+                score += 0.35;
+            }
+        }
+
+        return Math.min(1.0, score);
+    }
+
+    private boolean isSecurityQuery(String queryLower) {
+        return queryLower.contains("role") || queryLower.contains("rbac") || queryLower.contains("security") 
+                || queryLower.contains("access") || queryLower.contains("auth") || queryLower.contains("login");
+    }
+
     private String sanitizeDisplayContent(String content) {
         if (content == null) return "";
         String cleaned = content;

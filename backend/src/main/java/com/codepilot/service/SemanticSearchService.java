@@ -15,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class SemanticSearchService {
@@ -49,16 +48,28 @@ public class SemanticSearchService {
         float[] queryVector = embeddingEngine.generateEmbedding(request.getQuery());
 
         List<SearchResultDTO> results = new ArrayList<>();
+        String queryLower = request.getQuery().toLowerCase();
+        boolean isSecurityQuery = queryLower.contains("role") || queryLower.contains("rbac") || queryLower.contains("security") || queryLower.contains("access") || queryLower.contains("auth");
 
         for (CodeChunk chunk : chunks) {
             float[] chunkVector = embeddingEngine.generateEmbedding(chunk.getContent());
             double score = calculateCosineSimilarity(queryVector, chunkVector);
+            String contentLower = chunk.getContent().toLowerCase();
+            String pathLower = chunk.getFilePath().toLowerCase();
 
-            // Boost score slightly if exact keywords match in content or file path
-            String queryLower = request.getQuery().toLowerCase();
-            if (chunk.getContent().toLowerCase().contains(queryLower) || 
-                chunk.getFilePath().toLowerCase().contains(queryLower)) {
-                score = Math.min(1.0, score + 0.15);
+            // 1. Exact string keyword match boost
+            if (contentLower.contains(queryLower) || pathLower.contains(queryLower)) {
+                score = Math.min(1.0, score + 0.25);
+            }
+
+            // 2. Hybrid Security Concept Boost (WebSecurityConfigurerAdapter, SecurityFilterChain, @Configuration, @PreAuthorize, Role)
+            if (isSecurityQuery) {
+                if (contentLower.contains("securityfilterchain") || contentLower.contains("websecurity") 
+                        || contentLower.contains("@configuration") || contentLower.contains("@preauthorize") 
+                        || contentLower.contains("hasrole") || contentLower.contains("role.")
+                        || pathLower.contains("security") || pathLower.contains("auth")) {
+                    score = Math.min(1.0, score + 0.35);
+                }
             }
 
             SearchResultDTO result = SearchResultDTO.builder()

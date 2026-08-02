@@ -52,6 +52,9 @@ public class CodeChunkerEngine {
         String language = detectLanguage(fileName);
         int totalLines = fileLines.size();
 
+        // Extract class header & package info for structural context retention
+        String headerContext = extractHeaderContext(relativePath, fileName, fileLines);
+
         int startLine = 1;
         int chunkIndex = 0;
 
@@ -59,7 +62,10 @@ public class CodeChunkerEngine {
             int endLine = Math.min(startLine + DEFAULT_CHUNK_LINES - 1, totalLines);
 
             List<String> chunkLines = fileLines.subList(startLine - 1, endLine);
-            String chunkContent = String.join("\n", chunkLines);
+            String rawBody = String.join("\n", chunkLines);
+
+            // Prepend structural context header to retain class/package/annotation metadata across all chunks
+            String chunkContent = headerContext + "\n" + rawBody;
 
             if (!chunkContent.trim().isEmpty()) {
                 int tokenCount = estimateTokenCount(chunkContent);
@@ -89,11 +95,25 @@ public class CodeChunkerEngine {
         return chunks;
     }
 
+    private String extractHeaderContext(String relativePath, String fileName, List<String> lines) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("// Context: File=%s", relativePath));
+
+        for (int i = 0; i < Math.min(25, lines.size()); i++) {
+            String line = lines.get(i).trim();
+            if (line.startsWith("package ") || line.startsWith("import ") || line.startsWith("@Configuration") 
+                    || line.startsWith("@EnableWebSecurity") || line.startsWith("@EnableGlobalMethodSecurity")
+                    || line.startsWith("public class ") || line.startsWith("public interface ")) {
+                sb.append(" | ").append(line);
+            }
+        }
+        return sb.toString();
+    }
+
     public int estimateTokenCount(String content) {
         if (content == null || content.isEmpty()) {
             return 0;
         }
-        // Heuristic: ~4 characters per token or whitespace split
         return (int) Math.ceil(content.length() / 4.0);
     }
 }

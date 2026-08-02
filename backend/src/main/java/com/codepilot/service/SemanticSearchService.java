@@ -171,22 +171,39 @@ public class SemanticSearchService {
                 || queryLower.contains("access") || queryLower.contains("auth") || queryLower.contains("login") || queryLower.contains("password");
     }
 
+    /**
+     * Strips legacy internal metadata comments and flattened // Context: lines so display payload is 100% clean raw source code.
+     */
     private String sanitizeDisplayContent(String content) {
         if (content == null) return "";
         String cleaned = content;
-        if (cleaned.startsWith("/* Context Metadata:")) {
-            int endIdx = cleaned.indexOf("*/");
-            if (endIdx != -1) {
-                cleaned = cleaned.substring(endIdx + 2).trim();
-            }
-        }
+
+        // Strip multi-line comment metadata blocks
+        cleaned = cleaned.replaceAll("(?s)/\\*\\s*Context Metadata:.*?\\*/", "");
+
+        // Strip single-line or flattened // Context: File=... lines
+        cleaned = cleaned.replaceAll("(?m)^//\\s*Context:.*$", "");
+
+        // Handle legacy flattened lines starting with // Context:
         if (cleaned.startsWith("// Context:")) {
             int newlineIdx = cleaned.indexOf("\n");
             if (newlineIdx != -1) {
-                cleaned = cleaned.substring(newlineIdx + 1).trim();
+                cleaned = cleaned.substring(newlineIdx + 1);
+            } else {
+                int pkgIdx = cleaned.indexOf("package ");
+                int impIdx = cleaned.indexOf("import ");
+                int pubIdx = cleaned.indexOf("public ");
+                int minIdx = -1;
+                if (pkgIdx != -1) minIdx = pkgIdx;
+                if (impIdx != -1 && (minIdx == -1 || impIdx < minIdx)) minIdx = impIdx;
+                if (pubIdx != -1 && (minIdx == -1 || pubIdx < minIdx)) minIdx = pubIdx;
+                if (minIdx != -1) {
+                    cleaned = cleaned.substring(minIdx);
+                }
             }
         }
-        return cleaned;
+
+        return cleaned.trim();
     }
 
     private double calculateCosineSimilarity(float[] vectorA, float[] vectorB) {

@@ -65,7 +65,10 @@ export class RepoScannerComponent implements OnInit {
     this.loading = true;
     this.scannerService.getChunks(this.repoUuid).subscribe({
       next: (chunks) => {
-        this.chunks = chunks;
+        this.chunks = chunks.map(c => ({
+          ...c,
+          content: this.cleanContent(c.content)
+        }));
         this.applyFilters();
         this.loadStats();
         this.loading = false;
@@ -89,7 +92,10 @@ export class RepoScannerComponent implements OnInit {
     this.scannerService.scanRepository(this.repoUuid).subscribe({
       next: (chunks) => {
         this.scanning = false;
-        this.chunks = chunks;
+        this.chunks = chunks.map(c => ({
+          ...c,
+          content: this.cleanContent(c.content)
+        }));
         this.applyFilters();
         this.loadStats();
         this.snackBar.open(`Repository scanned successfully! ${chunks.length} chunks generated.`, 'Close', { duration: 3000 });
@@ -99,6 +105,28 @@ export class RepoScannerComponent implements OnInit {
         this.snackBar.open('Scanning failed. Check repository file tree.', 'Close', { duration: 4000 });
       }
     });
+  }
+
+  cleanContent(content: string): string {
+    if (!content) return '';
+    let text = content;
+    text = text.replace(/^(?:\/\/\s*Context:[^\n]*\n*|\/\*\s*Context Metadata:[\s\S]*?\*\/\s*)/g, '');
+    if (text.startsWith('// Context:')) {
+      const idx = text.indexOf('\n');
+      if (idx !== -1) {
+        text = text.substring(idx + 1);
+      } else {
+        const pkg = text.indexOf('package ');
+        const imp = text.indexOf('import ');
+        const pub = text.indexOf('public ');
+        let min = -1;
+        if (pkg !== -1) min = pkg;
+        if (imp !== -1 && (min === -1 || imp < min)) min = imp;
+        if (pub !== -1 && (min === -1 || pub < min)) min = pub;
+        if (min !== -1) text = text.substring(min);
+      }
+    }
+    return text.trim();
   }
 
   filterByLanguage(lang: string): void {
@@ -120,12 +148,10 @@ export class RepoScannerComponent implements OnInit {
   private applyFilters(): void {
     let result = [...this.chunks];
 
-    // Filter by Language
     if (this.selectedLanguage !== 'ALL') {
       result = result.filter(c => c.language.toLowerCase() === this.selectedLanguage.toLowerCase());
     }
 
-    // Filter by Search Query (File Name or Path or Content)
     if (this.searchQuery && this.searchQuery.trim() !== '') {
       const q = this.searchQuery.trim().toLowerCase();
       result = result.filter(c => 

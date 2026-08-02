@@ -62,7 +62,10 @@ export class RepoSearchComponent implements OnInit {
 
     this.searchService.searchCodebase(this.repoUuid, this.searchQuery.trim(), 5).subscribe({
       next: (data) => {
-        this.results = data;
+        this.results = data.map(res => ({
+          ...res,
+          content: this.cleanContent(res.content)
+        }));
         this.loading = false;
       },
       error: (err) => {
@@ -71,6 +74,28 @@ export class RepoSearchComponent implements OnInit {
         this.snackBar.open(msg, 'Close', { duration: 4000 });
       }
     });
+  }
+
+  cleanContent(content: string): string {
+    if (!content) return '';
+    let text = content;
+    text = text.replace(/^(?:\/\/\s*Context:[^\n]*\n*|\/\*\s*Context Metadata:[\s\S]*?\*\/\s*)/g, '');
+    if (text.startsWith('// Context:')) {
+      const idx = text.indexOf('\n');
+      if (idx !== -1) {
+        text = text.substring(idx + 1);
+      } else {
+        const pkg = text.indexOf('package ');
+        const imp = text.indexOf('import ');
+        const pub = text.indexOf('public ');
+        let min = -1;
+        if (pkg !== -1) min = pkg;
+        if (imp !== -1 && (min === -1 || imp < min)) min = imp;
+        if (pub !== -1 && (min === -1 || pub < min)) min = pub;
+        if (min !== -1) text = text.substring(min);
+      }
+    }
+    return text.trim();
   }
 
   getScorePercentage(score: number): number {

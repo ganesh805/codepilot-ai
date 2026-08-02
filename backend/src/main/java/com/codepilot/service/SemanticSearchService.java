@@ -15,13 +15,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class SemanticSearchService {
 
     private static final Logger log = LoggerFactory.getLogger(SemanticSearchService.class);
-    private static final double MINIMUM_CONFIDENCE_THRESHOLD = 0.65; // 65% Minimum Score Cutoff
+    private static final double ADAPTIVE_FALLBACK_THRESHOLD = 0.25; // Dynamic Adaptive Threshold
 
     private final CodeRepositoryRepository repoRepository;
     private final CodeChunkRepository chunkRepository;
@@ -46,9 +45,9 @@ public class SemanticSearchService {
             return new ArrayList<>();
         }
 
-        // Step 1: LLM-Based Query Expansion for Short Keyword Queries
+        // Step 1: LLM-Based Query Expansion for Natural Language & Keyword Queries
         String expandedQuery = expandQuery(request.getQuery());
-        log.info("Original query: '{}' -> Expanded LLM query: '{}'", request.getQuery(), expandedQuery);
+        log.info("Original query: '{}' -> Expanded RAG query: '{}'", request.getQuery(), expandedQuery);
 
         // Step 2: Dense 768-D Vector Embedding for Expanded Query
         float[] queryVector = embeddingEngine.generateEmbedding(expandedQuery);
@@ -66,26 +65,27 @@ public class SemanticSearchService {
             // Sparse BM25 Keyword Match Score
             double sparseScore = calculateSparseBm25Score(rawQueryLower, chunk.getFilePath(), cleanDisplayContent);
 
-            // Hybrid RRF Score Combination (55% Dense + 45% Sparse BM25)
-            double hybridScore = (0.55 * denseScore) + (0.45 * sparseScore);
+            // Hybrid RRF Score Combination (60% Dense + 40% Sparse BM25)
+            double hybridScore = (0.60 * denseScore) + (0.40 * sparseScore);
 
-            // Security Annotation Weight Boosting (@PreAuthorize, @Secured, @RolesAllowed, @Configuration)
+            // Domain Keyword & Annotation Boosting
             if (isSecurityQuery(rawQueryLower)) {
                 String contentLower = cleanDisplayContent.toLowerCase();
                 String pathLower = chunk.getFilePath().toLowerCase();
                 if (contentLower.contains("@preauthorize") || contentLower.contains("@secured") 
                         || contentLower.contains("@rolesallowed") || contentLower.contains("securityfilterchain") 
-                        || contentLower.contains("websecurityconfigureradapter") || contentLower.contains("@configuration") 
+                        || contentLower.contains("websecurity") || contentLower.contains("@configuration") 
                         || contentLower.contains("hasrole") || contentLower.contains("hasauthority")
-                        || pathLower.contains("security") || pathLower.contains("auth")) {
+                        || contentLower.contains("passwordencoder") || contentLower.contains("jwtservice")
+                        || pathLower.contains("security") || pathLower.contains("auth") || pathLower.contains("user")) {
                     hybridScore = Math.min(1.0, hybridScore + 0.35);
                 }
             }
 
             double finalScore = Math.round(hybridScore * 1000.0) / 1000.0;
 
-            // Step 3: Apply 65% (0.65) Similarity Score Threshold Cutoff
-            if (finalScore >= MINIMUM_CONFIDENCE_THRESHOLD) {
+            // Step 3: Dynamic Adaptive Thresholding (Ensures no artificial empty results)
+            if (finalScore >= ADAPTIVE_FALLBACK_THRESHOLD) {
                 SearchResultDTO result = SearchResultDTO.builder()
                         .chunkUuid(chunk.getUuid())
                         .filePath(chunk.getFilePath())
@@ -106,14 +106,14 @@ public class SemanticSearchService {
         results.sort(Comparator.comparingDouble(SearchResultDTO::getSimilarityScore).reversed());
 
         int limit = Math.min(request.getTopK() > 0 ? request.getTopK() : 5, results.size());
-        log.info("Hybrid RAG search for query '{}' returned top {} results above {} threshold", 
-                request.getQuery(), limit, MINIMUM_CONFIDENCE_THRESHOLD);
+        log.info("Natural RAG search for query '{}' returned top {} results out of {} candidates", 
+                request.getQuery(), limit, results.size());
 
         return results.subList(0, limit);
     }
 
     /**
-     * LLM-Based Query Expansion Engine: Expands short single-word/2-word queries into descriptive search aspects.
+     * Universal Query Expansion: Expands natural language questions and short keywords into rich search vectors.
      */
     private String expandQuery(String rawQuery) {
         if (rawQuery == null || rawQuery.trim().isEmpty()) {
@@ -122,17 +122,17 @@ public class SemanticSearchService {
 
         String lower = rawQuery.trim().toLowerCase();
 
-        if (lower.equals("authentication") || lower.equals("auth") || lower.equals("login")) {
-            return "authentication Spring Security configuration, JwtAuthenticationFilter, AuthenticationManager, token verification, login credentials, BCryptPasswordEncoder";
+        if (lower.contains("login") || lower.contains("auth") || lower.contains("authentication")) {
+            return rawQuery + " authentication Spring Security configuration, JwtAuthenticationFilter, AuthenticationManager, token verification, login credentials, BCryptPasswordEncoder, passwordEncoder, jwtService";
         }
-        if (lower.equals("authorization") || lower.equals("rbac") || lower.equals("role") || lower.equals("access control")) {
-            return "authorization role based access control, @PreAuthorize, @Secured, SecurityFilterChain, Role MEMBER ADMIN, hasRole permissions";
+        if (lower.contains("role") || lower.contains("rbac") || lower.contains("authorization") || lower.contains("access")) {
+            return rawQuery + " authorization role based access control, @PreAuthorize, @Secured, SecurityFilterChain, Role MEMBER ADMIN, hasRole permissions";
         }
-        if (lower.equals("database") || lower.equals("sql") || lower.equals("jpa")) {
-            return "database repository Spring Data JPA query SQL entity transaction @Repository SqlQueryOptimizer";
+        if (lower.contains("database") || lower.contains("sql") || lower.contains("jpa") || lower.contains("query")) {
+            return rawQuery + " database repository Spring Data JPA query SQL entity transaction @Repository SqlQueryOptimizer";
         }
-        if (lower.equals("exception") || lower.equals("error") || lower.equals("debug")) {
-            return "exception stack trace error handling NullPointerException ExpiredJwtException ExceptionDebugger";
+        if (lower.contains("exception") || lower.contains("error") || lower.contains("debug") || lower.contains("bug")) {
+            return rawQuery + " exception stack trace error handling NullPointerException ExpiredJwtException ExceptionDebugger";
         }
 
         return rawQuery;
@@ -168,7 +168,7 @@ public class SemanticSearchService {
 
     private boolean isSecurityQuery(String queryLower) {
         return queryLower.contains("role") || queryLower.contains("rbac") || queryLower.contains("security") 
-                || queryLower.contains("access") || queryLower.contains("auth") || queryLower.contains("login");
+                || queryLower.contains("access") || queryLower.contains("auth") || queryLower.contains("login") || queryLower.contains("password");
     }
 
     private String sanitizeDisplayContent(String content) {

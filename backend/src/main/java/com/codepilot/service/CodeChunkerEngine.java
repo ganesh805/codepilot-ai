@@ -43,6 +43,10 @@ public class CodeChunkerEngine {
         return EXTENSION_LANGUAGE_MAP.getOrDefault(ext, "PlainText");
     }
 
+    /**
+     * Language-Aware Structural Code Splitter.
+     * Preserves exact multi-line formatting, indentation, and newlines.
+     */
     public List<CodeChunk> chunkFile(CodeRepository repository, String relativePath, String fileName, List<String> fileLines) {
         List<CodeChunk> chunks = new ArrayList<>();
         if (fileLines == null || fileLines.isEmpty()) {
@@ -52,7 +56,7 @@ public class CodeChunkerEngine {
         String language = detectLanguage(fileName);
         int totalLines = fileLines.size();
 
-        // Extract class header & package info for structural context retention
+        // Build multi-line structural header preserving clean \n formatting
         String headerContext = extractHeaderContext(relativePath, fileName, fileLines);
 
         int startLine = 1;
@@ -61,11 +65,14 @@ public class CodeChunkerEngine {
         while (startLine <= totalLines) {
             int endLine = Math.min(startLine + DEFAULT_CHUNK_LINES - 1, totalLines);
 
+            // Language-Aware Adjustment: Adjust endLine to nearest method or class boundary if possible
+            endLine = adjustToLanguageBoundary(fileLines, startLine, endLine, totalLines, language);
+
             List<String> chunkLines = fileLines.subList(startLine - 1, endLine);
             String rawBody = String.join("\n", chunkLines);
 
-            // Prepend structural context header to retain class/package/annotation metadata across all chunks
-            String chunkContent = headerContext + "\n" + rawBody;
+            // Combine header context and code body preserving exact newlines (\n)
+            String chunkContent = headerContext.isEmpty() ? rawBody : headerContext + "\n" + rawBody;
 
             if (!chunkContent.trim().isEmpty()) {
                 int tokenCount = estimateTokenCount(chunkContent);
@@ -89,25 +96,55 @@ public class CodeChunkerEngine {
                 break;
             }
 
-            startLine += (DEFAULT_CHUNK_LINES - DEFAULT_OVERLAP_LINES);
+            startLine = Math.max(endLine - DEFAULT_OVERLAP_LINES + 1, startLine + 1);
         }
 
         return chunks;
     }
 
+    /**
+     * Preserves multi-line structure for package, class header, and Spring Security annotations.
+     */
     private String extractHeaderContext(String relativePath, String fileName, List<String> lines) {
         StringBuilder sb = new StringBuilder();
-        sb.append(String.format("// Context: File=%s", relativePath));
+        sb.append("/* Context Metadata:\n");
+        sb.append(" * File: ").append(relativePath).append("\n");
 
+        boolean hasMetadata = false;
         for (int i = 0; i < Math.min(25, lines.size()); i++) {
             String line = lines.get(i).trim();
-            if (line.startsWith("package ") || line.startsWith("import ") || line.startsWith("@Configuration") 
+            if (line.startsWith("package ") || line.startsWith("@Configuration") 
                     || line.startsWith("@EnableWebSecurity") || line.startsWith("@EnableGlobalMethodSecurity")
-                    || line.startsWith("public class ") || line.startsWith("public interface ")) {
-                sb.append(" | ").append(line);
+                    || line.startsWith("@EnableMethodSecurity") || line.startsWith("public class ") 
+                    || line.startsWith("public interface ")) {
+                sb.append(" * ").append(line).append("\n");
+                hasMetadata = true;
             }
         }
-        return sb.toString();
+        sb.append(" */");
+
+        return hasMetadata ? sb.toString() : "";
+    }
+
+    /**
+     * Language-Aware Boundary Adjuster: Looks for class, method, or annotation boundaries.
+     */
+    private int adjustToLanguageBoundary(List<String> lines, int startLine, int targetEnd, int maxLines, String language) {
+        if (targetEnd >= maxLines) {
+            return maxLines;
+        }
+
+        // Look back up to 8 lines for clean method/class closing or opening boundary
+        for (int i = targetEnd; i > Math.max(startLine + 20, targetEnd - 8); i--) {
+            String line = lines.get(i - 1).trim();
+            if (line.endsWith("}") || line.startsWith("public ") || line.startsWith("private ") 
+                    || line.startsWith("protected ") || line.startsWith("@PreAuthorize") 
+                    || line.startsWith("@Secured") || line.startsWith("@RolesAllowed") 
+                    || line.startsWith("@Bean")) {
+                return i;
+            }
+        }
+        return targetEnd;
     }
 
     public int estimateTokenCount(String content) {

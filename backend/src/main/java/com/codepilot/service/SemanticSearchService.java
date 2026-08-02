@@ -44,12 +44,12 @@ public class SemanticSearchService {
             return new ArrayList<>();
         }
 
-        // Convert query string into 768-D normalized vector
+        // Convert query string into 768-D normalized vector using text-embedding-004
         float[] queryVector = embeddingEngine.generateEmbedding(request.getQuery());
 
         List<SearchResultDTO> results = new ArrayList<>();
         String queryLower = request.getQuery().toLowerCase();
-        boolean isSecurityQuery = queryLower.contains("role") || queryLower.contains("rbac") || queryLower.contains("security") || queryLower.contains("access") || queryLower.contains("auth");
+        boolean isSecurityRbacQuery = queryLower.contains("role") || queryLower.contains("rbac") || queryLower.contains("security") || queryLower.contains("access control") || queryLower.contains("auth") || queryLower.contains("permission");
 
         for (CodeChunk chunk : chunks) {
             float[] chunkVector = embeddingEngine.generateEmbedding(chunk.getContent());
@@ -62,13 +62,14 @@ public class SemanticSearchService {
                 score = Math.min(1.0, score + 0.25);
             }
 
-            // 2. Hybrid Security Concept Boost (WebSecurityConfigurerAdapter, SecurityFilterChain, @Configuration, @PreAuthorize, Role)
-            if (isSecurityQuery) {
-                if (contentLower.contains("securityfilterchain") || contentLower.contains("websecurity") 
-                        || contentLower.contains("@configuration") || contentLower.contains("@preauthorize") 
-                        || contentLower.contains("hasrole") || contentLower.contains("role.")
+            // 2. Annotation Weight Boosting for Security & Access Control (@PreAuthorize, @Secured, @RolesAllowed, @Configuration)
+            if (isSecurityRbacQuery) {
+                if (contentLower.contains("@preauthorize") || contentLower.contains("@secured") 
+                        || contentLower.contains("@rolesallowed") || contentLower.contains("securityfilterchain") 
+                        || contentLower.contains("websecurityconfigureradapter") || contentLower.contains("@configuration") 
+                        || contentLower.contains("hasrole") || contentLower.contains("hasauthority") || contentLower.contains("haspermission")
                         || pathLower.contains("security") || pathLower.contains("auth")) {
-                    score = Math.min(1.0, score + 0.35);
+                    score = Math.min(1.0, score + 0.40);
                 }
             }
 

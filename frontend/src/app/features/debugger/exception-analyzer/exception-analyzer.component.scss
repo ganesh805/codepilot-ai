@@ -316,7 +316,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
 
             h2 {
               margin: 0;
@@ -331,6 +331,16 @@
               font-size: 0.75rem;
               color: #94a3b8;
             }
+          }
+
+          .confidence-reason-banner {
+            background: rgba(56, 189, 248, 0.1);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            color: #7dd3fc;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 0.78rem;
+            margin-bottom: 14px;
           }
 
           .metric-grid {
@@ -369,6 +379,9 @@
 
                 &.risk-val {
                   color: #4ade80;
+                  &.risk-high {
+                    color: #f87171;
+                  }
                 }
               }
             }

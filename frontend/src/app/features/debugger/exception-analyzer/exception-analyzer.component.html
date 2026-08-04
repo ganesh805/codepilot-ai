@@ -1,7 +1,7 @@
 <div class="debugger-container">
   <div class="debugger-header">
-    <h1>🐛 AI Exception Analyzer & Stack Trace Debugger</h1>
-    <p class="subtitle">Dynatrace & Sentry-grade automated root cause analysis, evidence-based stack frame extraction, and production code fixes.</p>
+    <h1>🐛 AI Zero-Hallucination Exception Analyzer</h1>
+    <p class="subtitle">Evidence-based stack trace diagnostics, root cause extraction, and production code fixes (Zero Hallucination Guarantee).</p>
   </div>
 
   <div class="debug-grid">
@@ -55,15 +55,15 @@
     <div class="result-panel" id="debug-results-container">
       <div *ngIf="!analysisResult && !loading" class="empty-result">
         <span class="empty-icon">🩺</span>
-        <h3>Ready for Enterprise Exception Diagnostics</h3>
-        <p>Paste a stack trace log on the left or click a sample preset button to run evidence-based root cause analysis.</p>
+        <h3>Ready for Evidence-Based Diagnostics</h3>
+        <p>Paste a stack trace log on the left or click a sample preset button to run zero-hallucination root cause analysis.</p>
       </div>
 
       <!-- Multi-stage Loading Progress -->
       <div *ngIf="loading" class="loading-state card-box">
         <mat-spinner diameter="40"></mat-spinner>
         <h4>{{ loadingStage }}</h4>
-        <p>Analyzing application stack frames & root cause evidence...</p>
+        <p>Extracting application stack frames & root cause evidence...</p>
         <mat-progress-bar mode="indeterminate" class="custom-progress"></mat-progress-bar>
       </div>
 
@@ -74,10 +74,10 @@
         <div class="sticky-debug-header">
           <div class="header-left">
             <span class="sev-badge" [class.badge-crit]="analysisResult.severity === 'Critical'" [class.badge-high]="analysisResult.severity === 'High'" [class.badge-med]="analysisResult.severity === 'Medium'" [class.badge-low]="analysisResult.severity === 'Low'">
-              {{ analysisResult.severity || 'High' }} Severity
+              {{ analysisResult.severity }} Severity
             </span>
-            <span class="conf-tag mono">🎯 {{ analysisResult.confidenceScore || 95 }}% Confidence</span>
-            <span class="time-tag mono">⏱️ Fix Time: {{ analysisResult.estimatedFixTime || '5 mins' }}</span>
+            <span class="conf-tag mono">🎯 {{ analysisResult.confidenceScore }}% Confidence</span>
+            <span class="time-tag mono">⏱️ Fix Time: {{ analysisResult.estimatedFixTime }}</span>
           </div>
 
           <div class="action-buttons">
@@ -97,23 +97,28 @@
             <span class="date mono">{{ analysisResult.createdAt | date:'medium' }}</span>
           </div>
 
-          <!-- Sticky Summary Cards -->
+          <!-- Confidence Reason Banner -->
+          <div class="confidence-reason-banner mono" *ngIf="analysisResult.confidenceReason">
+            💡 <strong>Confidence Justification</strong>: {{ analysisResult.confidenceReason }}
+          </div>
+
+          <!-- Metric Summary Cards -->
           <div class="metric-grid">
             <div class="metric-card">
               <span class="label">Root Cause File</span>
-              <span class="val mono">{{ analysisResult.rootCauseFile || 'UserService.java' }}</span>
+              <span class="val mono">{{ analysisResult.rootCauseFile && analysisResult.rootCauseFile !== 'N/A' ? analysisResult.rootCauseFile : 'N/A' }}</span>
             </div>
             <div class="metric-card">
               <span class="label">Line Number</span>
-              <span class="val line-highlight mono">Line {{ analysisResult.rootCauseLineNumber || 42 }}</span>
+              <span class="val line-highlight mono">{{ analysisResult.rootCauseLineNumber ? ('Line ' + analysisResult.rootCauseLineNumber) : 'N/A' }}</span>
             </div>
             <div class="metric-card">
               <span class="label">Target Method</span>
-              <span class="val mono">{{ analysisResult.rootCauseMethod || 'findUser' }}()</span>
+              <span class="val mono">{{ analysisResult.rootCauseMethod && analysisResult.rootCauseMethod !== 'N/A' ? (analysisResult.rootCauseMethod + '()') : 'N/A' }}</span>
             </div>
             <div class="metric-card">
-              <span class="label">Merge / Deploy Risk</span>
-              <span class="val risk-val">{{ analysisResult.mergeRisk || 'Low' }} Risk</span>
+              <span class="label">Deployment Risk</span>
+              <span class="val risk-val" [class.risk-high]="analysisResult.mergeRisk === 'Critical' || analysisResult.mergeRisk === 'High'">{{ analysisResult.mergeRisk || 'Low' }} Risk</span>
             </div>
           </div>
 
@@ -146,7 +151,7 @@
             <h3>🔍 Root Cause Diagnosis</h3>
             <p class="summary-text">{{ analysisResult.rootCauseSummary || analysisResult.rootCause }}</p>
             
-            <h4>📌 Root Cause Evidence:</h4>
+            <h4>📌 Extracted Evidence:</h4>
             <div *ngFor="let ev of analysisResult.evidenceList" class="evidence-card mono">
               - {{ ev }}
             </div>

@@ -19,6 +19,7 @@ public class ExceptionAnalysisResponse {
     private String errorMessage;
     private String severity; // Critical, High, Medium, Low
     private int confidenceScore; // 0-100%
+    private String confidenceReason;
     private String rootCauseSummary;
     private String estimatedFixTime;
     private String productionImpact;

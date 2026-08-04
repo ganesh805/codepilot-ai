@@ -69,7 +69,7 @@ public class ExceptionDebuggerService {
 
         List<String> evidenceList = extractEvidence(exceptionType, errorMessage, appLoc, input);
         Map<String, Integer> possibleCauses = computePossibleCauses(exceptionType, errorMessage, appLoc, input);
-        List<String> checklist = computeChecklist(exceptionType, errorMessage);
+        List<String> checklist = computeChecklist(exceptionType, errorMessage, appLoc);
         List<String> technologies = computeTechnologies(exceptionType, input);
         List<String> preventiveRecs = computePreventiveRecommendations(exceptionType);
         List<String> resources = computeLearningResources(exceptionType);
@@ -340,9 +340,13 @@ public class ExceptionDebuggerService {
     }
 
     // --- UNIVERSAL KNOWLEDGE BASE: CHECKLIST ---
-    private List<String> computeChecklist(String type, String msg) {
+    private List<String> computeChecklist(String type, String msg, StackFrameAppLocation appLoc) {
         List<String> list = new ArrayList<>();
         String msgLower = msg.toLowerCase();
+
+        if (appLoc != null) {
+            list.add(String.format("✔ Inspect line %d in `%s` for uninitialized object reference", appLoc.lineNumber, appLoc.file));
+        }
 
         if (type.contains("NoSuchBeanDefinitionException")) {
             if (msg.contains("PasswordEncoder")) {
@@ -362,8 +366,7 @@ public class ExceptionDebuggerService {
             list.add("✔ Check database table constraints (UNIQUE, FOREIGN KEY, NOT NULL)");
             list.add("✔ Add validation checks before persisting entity");
         } else if (type.contains("NullPointerException")) {
-            list.add("✔ Inspect exception line number for uninitialized object reference");
-            list.add("✔ Ensure Spring components use Constructor Injection for dependencies");
+            list.add("✔ Ensure Spring components use Constructor Injection (`final` fields) for dependencies");
         } else if (type.contains("ExpiredJwtException")) {
             list.add("✔ Verify JWT token expiration duration setting (`exp` claim)");
             list.add("✔ Implement client-side refresh token flow");
@@ -520,6 +523,9 @@ public class ExceptionDebuggerService {
 
     // --- KNOWLEDGE BASE: FIXED CODE EXAMPLES ---
     private String buildFixedCodeExample(String type, String msg, StackFrameAppLocation appLoc, String rawInput) {
+        String className = (appLoc != null && appLoc.file != null && appLoc.file.endsWith(".java")) ? appLoc.file.substring(0, appLoc.file.length() - 5) : "UserService";
+        String methodName = (appLoc != null && appLoc.methodName != null) ? appLoc.methodName : "getUserProfile";
+
         if (type.contains("NoSuchBeanDefinitionException") && msg.contains("PasswordEncoder")) {
             return """
                    // 🟢 FIXED CODE (SecurityConfig.java):
@@ -535,23 +541,29 @@ public class ExceptionDebuggerService {
                    """;
         }
         if (type.contains("NoSuchBeanDefinitionException") || type.contains("NullPointerException")) {
-            return """
-                   // 🟢 FIXED CODE (Spring Boot Constructor Injection):
+            return String.format("""
+                   // 🟢 FIXED CODE (%s.java):
+                   package com.codepilot.service;
+
+                   import org.springframework.stereotype.Service;
+                   import java.util.Objects;
+
                    @Service
-                   public class UserService {
+                   public class %s {
 
                        private final UserRepository userRepository;
 
-                       public UserService(UserRepository userRepository) {
+                       // Spring Boot automatically injects UserRepository at startup
+                       public %s(UserRepository userRepository) {
                            this.userRepository = Objects.requireNonNull(userRepository, "userRepository must not be null");
                        }
 
-                       public User findUser(String username) {
+                       public User %s(String username) {
                            return userRepository.findByUsername(username)
                                    .orElseThrow(() -> new UserNotFoundException("User not found: " + username));
                        }
                    }
-                   """;
+                   """, className, className, className, methodName);
         }
         if (type.contains("SQLNonTransientConnectionException") || rawInput.contains("Access denied")) {
             return """

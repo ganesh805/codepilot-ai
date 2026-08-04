@@ -49,7 +49,7 @@ public class ExceptionDebuggerService {
             repo = repoRepository.findByUuidAndUserId(request.getRepositoryUuid(), user.getId()).orElse(null);
         }
 
-        // 1. STRICT STACK TRACE & DEEPEST CAUSE PARSING (ZERO HALLUCINATION)
+        // 1. STRICT STACK TRACE & DEEPEST CAUSE PARSING (ZERO HALLUCINATION GUARANTEE)
         String deepestTrace = extractDeepestCauseTrace(input);
         String exceptionType = extractExceptionType(deepestTrace);
         String errorMessage = extractErrorMessage(deepestTrace);
@@ -72,7 +72,7 @@ public class ExceptionDebuggerService {
 
         String rootCauseSummary = buildRootCauseSummary(exceptionType, errorMessage, appLoc);
         String recommendedFix = buildRecommendedFix(exceptionType, errorMessage, appLoc);
-        String fixedCodeExample = buildFixedCodeExample(exceptionType, appLoc);
+        String fixedCodeExample = buildFixedCodeExample(exceptionType, errorMessage, appLoc);
 
         List<String> timelineSteps = buildEvidenceTimeline(exceptionType, errorMessage, appLoc);
 
@@ -150,10 +150,11 @@ public class ExceptionDebuggerService {
         if (matcher.find()) {
             return matcher.group(1).trim();
         }
-        if (input.contains("NullPointerException")) return "java.lang.NullPointerException";
+        if (input.contains("NoSuchBeanDefinitionException")) return "org.springframework.beans.factory.NoSuchBeanDefinitionException";
         if (input.contains("BeanCreationException")) return "org.springframework.beans.factory.BeanCreationException";
         if (input.contains("SQLNonTransientConnectionException")) return "java.sql.SQLNonTransientConnectionException";
-        if (input.contains("SQLException")) return "java.sql.SQLException";
+        if (input.contains("ConstraintViolationException")) return "jakarta.validation.ConstraintViolationException";
+        if (input.contains("NullPointerException")) return "java.lang.NullPointerException";
         if (input.contains("ExpiredJwtException")) return "io.jsonwebtoken.ExpiredJwtException";
         if (input.contains("OutOfMemoryError")) return "java.lang.OutOfMemoryError";
         if (input.contains("StackOverflowError")) return "java.lang.StackOverflowError";
@@ -202,7 +203,7 @@ public class ExceptionDebuggerService {
                 || upper.contains("SQLEXCEPTION") || upper.contains("JPASYSTEMEXCEPTION")) {
             return "High";
         }
-        if (upper.contains("NULLPOINTEREXCEPTION") || upper.contains("ILLEGALARGUMENTEXCEPTION") || upper.contains("METHODARGUMENTNOTVALIDEXCEPTION")) {
+        if (upper.contains("NULLPOINTEREXCEPTION") || upper.contains("ILLEGALARGUMENTEXCEPTION") || upper.contains("CONSTRAINTVIOLATIONEXCEPTION")) {
             return "Medium";
         }
         return "Low";
@@ -210,8 +211,9 @@ public class ExceptionDebuggerService {
 
     private ConfidenceDiagnosis computeConfidence(String type, String msg, StackFrameAppLocation appLoc) {
         String msgLower = msg.toLowerCase();
-        if (msgLower.contains("access denied") || msgLower.contains("connection refused") || type.contains("ExpiredJwtException")) {
-            return new ConfidenceDiagnosis(100, "Exact error message pattern extracted directly from exception payload.");
+        if (msgLower.contains("access denied") || msgLower.contains("connection refused") 
+                || type.contains("ExpiredJwtException") || type.contains("NoSuchBeanDefinitionException")) {
+            return new ConfidenceDiagnosis(100, "Exact root cause exception pattern extracted directly from exception message.");
         }
         if (appLoc != null) {
             return new ConfidenceDiagnosis(95, String.format("Application stack frame '%s:%d' identified in trace.", appLoc.file, appLoc.lineNumber));
@@ -226,9 +228,10 @@ public class ExceptionDebuggerService {
     }
 
     private String computeProductionImpact(String type, String msg, String severity) {
-        if (severity.equals("Critical")) return "Application Startup or Infrastructure Failure! Services cannot process incoming API traffic.";
+        if (severity.equals("Critical")) return "Application Startup or Infrastructure Failure! Services cannot boot or accept API traffic.";
         if (type.contains("NullPointerException")) return "API HTTP 500 Server Error served to users during request execution.";
         if (type.contains("ExpiredJwtException")) return "Authentication Failure! Client JWT Bearer token expired, rejecting API requests.";
+        if (type.contains("ConstraintViolationException")) return "Data Integrity Violation! Database transaction rollback executed.";
         return "Operational Exception or Business Processing Error.";
     }
 
@@ -250,20 +253,22 @@ public class ExceptionDebuggerService {
         Map<String, Integer> map = new LinkedHashMap<>();
         String msgLower = msg.toLowerCase();
 
-        if (msgLower.contains("access denied")) {
+        if (type.contains("NoSuchBeanDefinitionException")) {
+            map.put("Target bean class missing @Service, @Repository, or @Component annotation", 100);
+            map.put("Spring @ComponentScan boundary excluding required domain package", 90);
+        } else if (type.contains("BeanCreationException")) {
+            map.put("Unsatisfied dependency or circular reference during Spring Bean initialization", 95);
+            map.put("Configuration property error in application.properties or application.yml", 85);
+        } else if (msgLower.contains("access denied") || type.contains("SQLNonTransientConnectionException")) {
             map.put("Incorrect database username or password in application.properties / application.yml", 100);
             map.put("Database user lacks CONNECT or SELECT privileges on target schema", 85);
-        } else if (msgLower.contains("connection refused")) {
-            map.put("Target Database or Redis service is offline or unreachable on configured port", 100);
-            map.put("Docker container network configuration or hostname mismatch", 90);
         } else if (type.contains("NullPointerException")) {
             map.put("Missing Spring @Autowired / Dependency Injection annotation on target field", 95);
             map.put("Target class instantiated manually via 'new' operator bypassing Spring IoC Container", 90);
-        } else if (type.contains("BeanCreationException")) {
-            map.put("Missing @Service / @Repository annotation on target component implementation", 95);
-            map.put("Spring @ComponentScan boundary excluding required domain packages", 85);
         } else if (type.contains("ExpiredJwtException")) {
             map.put("JWT Bearer token expiration timestamp (exp claim) passed valid lifetime window", 100);
+        } else if (type.contains("ConstraintViolationException")) {
+            map.put("Database table foreign key constraint or unique column constraint violation", 95);
         } else {
             map.put("Unhandled runtime execution boundary failure", 85);
         }
@@ -274,14 +279,17 @@ public class ExceptionDebuggerService {
         List<String> list = new ArrayList<>();
         String msgLower = msg.toLowerCase();
 
-        if (msgLower.contains("access denied") || msgLower.contains("connection refused")) {
+        if (type.contains("NoSuchBeanDefinitionException") || type.contains("BeanCreationException")) {
+            list.add("✔ Verify target Spring class has `@Service`, `@Repository`, or `@Component` annotation");
+            list.add("✔ Ensure class uses Spring Constructor Injection instead of `new`");
+            list.add("✔ Check `@ComponentScan` package boundaries in main application class");
+        } else if (msgLower.contains("access denied") || type.contains("SQLNonTransientConnectionException")) {
             list.add("✔ Verify `spring.datasource.username` and `spring.datasource.password` in application.properties");
             list.add("✔ Confirm database container / service is running and accepting port connections");
-            list.add("✔ Verify database user permissions on target schema");
-        } else if (type.contains("NullPointerException") || type.contains("BeanCreationException")) {
-            list.add("✔ Verify target service/repository is annotated with `@Service` or `@Repository`");
-            list.add("✔ Ensure class uses Spring Constructor Injection instead of `new`");
-            list.add("✔ Check `@ComponentScan` package boundaries in application launcher class");
+            list.add("✔ Verify database user privileges on target schema");
+        } else if (type.contains("NullPointerException")) {
+            list.add("✔ Verify target repository or service field is injected via constructor injection");
+            list.add("✔ Inspect target line number in application code for null dereference");
         } else if (type.contains("ExpiredJwtException")) {
             list.add("✔ Verify JWT `exp` expiration claim duration");
             list.add("✔ Ensure client refreshes access tokens prior to expiration");
@@ -296,7 +304,7 @@ public class ExceptionDebuggerService {
         tech.add("Java 21");
         tech.add("Spring Boot 3.3");
         if (input.contains("sql") || input.contains("jdbc") || type.contains("SQL")) tech.add("MySQL / PostgreSQL");
-        if (input.contains("jpa") || input.contains("hibernate")) tech.add("Spring Data JPA");
+        if (input.contains("jpa") || input.contains("hibernate") || type.contains("ConstraintViolation")) tech.add("Spring Data JPA");
         if (type.contains("Jwt")) tech.add("Spring Security & JWT");
         return tech;
     }
@@ -318,26 +326,28 @@ public class ExceptionDebuggerService {
     }
 
     private String buildRootCauseSummary(String type, String msg, StackFrameAppLocation appLoc) {
-        if (msg != null && (msg.contains("Access denied") || msg.contains("Connection refused"))) {
-            return String.format("Database Failure: %s", msg);
+        if (type.contains("NoSuchBeanDefinitionException")) {
+            return "NoSuchBeanDefinitionException: Spring IoC container could not find a matching bean definition.";
+        }
+        if (type.contains("BeanCreationException")) {
+            return "BeanCreationException: Spring Boot application startup failed during bean instantiation.";
+        }
+        if (type.contains("SQLNonTransientConnectionException") || msg.contains("Access denied")) {
+            return String.format("Database Connection Failure: %s", msg);
         }
         if (type.contains("NullPointerException")) {
             return String.format("NullPointerException in %s: Invoking a method on an uninitialized null reference.", 
                     appLoc != null ? appLoc.file + ":" + appLoc.lineNumber : "application code");
         }
-        if (type.contains("BeanCreationException")) {
-            return "Spring Boot Application Startup Failure: Unsatisfied dependency injection requirements.";
-        }
         return String.format("%s: %s", type, msg);
     }
 
     private String buildRecommendedFix(String type, String msg, StackFrameAppLocation appLoc) {
-        String msgLower = msg.toLowerCase();
-        if (msgLower.contains("access denied")) {
-            return "Evidence: 'Access denied for user'. Remedy: Update `spring.datasource.username` and `spring.datasource.password` in application.properties to match database credentials.";
+        if (type.contains("NoSuchBeanDefinitionException") || type.contains("BeanCreationException")) {
+            return "Evidence: Missing Bean Definition. Remedy: Annotate target class with `@Service` or `@Repository` and verify `@ComponentScan` packages.";
         }
-        if (msgLower.contains("connection refused")) {
-            return "Evidence: 'Connection refused'. Remedy: Start the database container/service and verify port mapping.";
+        if (type.contains("SQLNonTransientConnectionException") || msg.contains("Access denied")) {
+            return "Evidence: Database connection error. Remedy: Update `spring.datasource.username` and `spring.datasource.password` in application.properties.";
         }
         if (type.contains("NullPointerException")) {
             return "Evidence: Null reference dereference. Remedy: Refactor target class to use Spring Constructor Injection with `final` fields.";
@@ -345,10 +355,10 @@ public class ExceptionDebuggerService {
         return "Evidence: Exception in trace. Remedy: Enclose boundary in structured try-catch handling and log exact error message.";
     }
 
-    private String buildFixedCodeExample(String type, StackFrameAppLocation appLoc) {
-        if (type.contains("NullPointerException")) {
+    private String buildFixedCodeExample(String type, String msg, StackFrameAppLocation appLoc) {
+        if (type.contains("NoSuchBeanDefinitionException") || type.contains("NullPointerException")) {
             return """
-                   // 🟢 FIXED CODE (Spring Boot Constructor Injection):
+                   // 🟢 FIXED CODE (Spring Boot Constructor Injection & Service Annotation):
                    @Service
                    public class UserService {
 
@@ -378,13 +388,11 @@ public class ExceptionDebuggerService {
     private List<String> buildEvidenceTimeline(String type, String msg, StackFrameAppLocation appLoc) {
         List<String> steps = new ArrayList<>();
         steps.add("Exception: " + type);
-        if (msg.contains("Access denied")) {
-            steps.add("JDBC Driver ➔ Access Denied ('root'@'localhost') ➔ Fix Database Credentials");
-        } else if (appLoc != null) {
+        if (appLoc != null) {
             steps.add("File: " + appLoc.file);
             steps.add("Line " + appLoc.lineNumber + " (" + appLoc.methodName + ")");
             steps.add("Class: " + appLoc.className);
-            steps.add("Fix: Apply Spring Dependency Injection");
+            steps.add("Fix: Apply Spring Constructor Injection");
         } else {
             steps.add("Framework Execution Boundary ➔ N/A App Frame ➔ Inspect Exception Message");
         }

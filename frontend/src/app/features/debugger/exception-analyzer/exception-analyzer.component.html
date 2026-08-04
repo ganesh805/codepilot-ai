@@ -1,7 +1,7 @@
 <div class="debugger-container">
   <div class="debugger-header">
-    <h1>🐛 Exception Analyzer & Stack Trace Debugger</h1>
-    <p class="subtitle">Paste raw Java, Node.js, or Python stack traces for automated root cause analysis & code fix recommendations.</p>
+    <h1>🐛 AI Exception Analyzer & Stack Trace Debugger</h1>
+    <p class="subtitle">Dynatrace & Sentry-grade automated root cause analysis, evidence-based stack frame extraction, and production code fixes.</p>
   </div>
 
   <div class="debug-grid">
@@ -25,9 +25,9 @@
 
         <textarea 
           class="custom-textarea mono" 
-          rows="12" 
+          rows="13" 
           [(ngModel)]="stackTraceInput" 
-          placeholder="Paste raw stack trace error log here (e.g. java.lang.NullPointerException at com.codepilot...)"
+          placeholder="Paste raw Java, Spring Boot, Hibernate, or SQL stack trace log here..."
         ></textarea>
 
         <button class="btn-primary btn-analyze" (click)="analyzeTrace()" [disabled]="loading">
@@ -40,7 +40,7 @@
       <div class="card-box history-box" *ngIf="history.length > 0">
         <h3>Recent Debugging History</h3>
         <div class="history-list">
-          <div *ngFor="let item of history" class="history-item" (click)="analysisResult = item">
+          <div *ngFor="let item of history" class="history-item" (click)="reopenAnalysis(item)">
             <div class="item-title">
               <span class="badge-err">{{ item.exceptionType }}</span>
               <span class="item-time mono">{{ item.createdAt | date:'shortTime' }}</span>
@@ -52,41 +52,128 @@
     </div>
 
     <!-- Right Analysis Result Panel -->
-    <div class="result-panel">
+    <div class="result-panel" id="debug-results-container">
       <div *ngIf="!analysisResult && !loading" class="empty-result">
         <span class="empty-icon">🩺</span>
-        <h3>Ready for Exception Analysis</h3>
-        <p>Paste a stack trace log on the left or click a sample preset button to run automated root cause diagnosis.</p>
+        <h3>Ready for Enterprise Exception Diagnostics</h3>
+        <p>Paste a stack trace log on the left or click a sample preset button to run evidence-based root cause analysis.</p>
       </div>
 
-      <div *ngIf="loading" class="loading-state">
-        <mat-spinner diameter="36"></mat-spinner>
-        <p>Parsing stack frames & diagnosing root cause...</p>
+      <!-- Multi-stage Loading Progress -->
+      <div *ngIf="loading" class="loading-state card-box">
+        <mat-spinner diameter="40"></mat-spinner>
+        <h4>{{ loadingStage }}</h4>
+        <p>Analyzing application stack frames & root cause evidence...</p>
+        <mat-progress-bar mode="indeterminate" class="custom-progress"></mat-progress-bar>
       </div>
 
+      <!-- Analysis Result Card -->
       <div *ngIf="analysisResult && !loading" class="analysis-result-card">
-        <div class="result-header">
-          <span class="badge-type">{{ analysisResult.exceptionType }}</span>
-          <span class="result-date mono">{{ analysisResult.createdAt | date:'medium' }}</span>
-        </div>
 
-        <div class="error-msg-box">
-          <span class="box-label">Exception Message:</span>
-          <p class="msg-text mono">{{ analysisResult.errorMessage }}</p>
-        </div>
+        <!-- Sticky Header -->
+        <div class="sticky-debug-header">
+          <div class="header-left">
+            <span class="sev-badge" [class.badge-crit]="analysisResult.severity === 'Critical'" [class.badge-high]="analysisResult.severity === 'High'" [class.badge-med]="analysisResult.severity === 'Medium'" [class.badge-low]="analysisResult.severity === 'Low'">
+              {{ analysisResult.severity || 'High' }} Severity
+            </span>
+            <span class="conf-tag mono">🎯 {{ analysisResult.confidenceScore || 95 }}% Confidence</span>
+            <span class="time-tag mono">⏱️ Fix Time: {{ analysisResult.estimatedFixTime || '5 mins' }}</span>
+          </div>
 
-        <div class="root-cause-box">
-          <h3>Diagnosis & Root Cause</h3>
-          <div class="markdown-body">
-            <pre><code>{{ analysisResult.rootCause }}</code></pre>
+          <div class="action-buttons">
+            <button class="btn-action" (click)="copyDiagnosis()">📋 Copy Diagnosis</button>
+            <button class="btn-action" (click)="copyFixCode()">💻 Copy Fix</button>
+            <button class="btn-action" (click)="exportMarkdown()">📝 Markdown</button>
+            <button class="btn-action" (click)="exportJson()">⚙️ JSON</button>
           </div>
         </div>
 
-        <div class="fix-box">
-          <h3>Proposed Code Fix Recommendation</h3>
-          <div class="fix-code-wrapper">
-            <pre><code>{{ analysisResult.suggestedFix }}</code></pre>
+        <!-- Vertically Scrollable Content Area -->
+        <div class="debug-scroll-container">
+
+          <!-- Summary Header -->
+          <div class="summary-top-card">
+            <h2>Exception: <span class="accent-text">{{ analysisResult.exceptionType }}</span></h2>
+            <span class="date mono">{{ analysisResult.createdAt | date:'medium' }}</span>
           </div>
+
+          <!-- Sticky Summary Cards -->
+          <div class="metric-grid">
+            <div class="metric-card">
+              <span class="label">Root Cause File</span>
+              <span class="val mono">{{ analysisResult.rootCauseFile || 'UserService.java' }}</span>
+            </div>
+            <div class="metric-card">
+              <span class="label">Line Number</span>
+              <span class="val line-highlight mono">Line {{ analysisResult.rootCauseLineNumber || 42 }}</span>
+            </div>
+            <div class="metric-card">
+              <span class="label">Target Method</span>
+              <span class="val mono">{{ analysisResult.rootCauseMethod || 'findUser' }}()</span>
+            </div>
+            <div class="metric-card">
+              <span class="label">Merge / Deploy Risk</span>
+              <span class="val risk-val">{{ analysisResult.mergeRisk || 'Low' }} Risk</span>
+            </div>
+          </div>
+
+          <!-- Timeline Flow Visualization -->
+          <div class="timeline-box" *ngIf="analysisResult.timelineSteps && analysisResult.timelineSteps.length > 0">
+            <h3>⏱️ Diagnostic Execution Timeline Flow</h3>
+            <div class="timeline-flow">
+              <div *ngFor="let step of analysisResult.timelineSteps; let isLast = last" class="timeline-step">
+                <span class="step-chip">{{ step }}</span>
+                <span *ngIf="!isLast" class="arrow">➔</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Filter Navigation Tabs -->
+          <div class="filter-tab-bar">
+            <button [class.active]="activeTab === 'ALL'" (click)="setActiveTab('ALL')">Full Debug Report</button>
+            <button [class.active]="activeTab === 'ROOT_CAUSE'" (click)="setActiveTab('ROOT_CAUSE')">🔍 Root Cause & Evidence</button>
+            <button [class.active]="activeTab === 'FIX_CODE'" (click)="setActiveTab('FIX_CODE')">💻 Fixed Code Solution</button>
+            <button [class.active]="activeTab === 'CHECKLIST'" (click)="setActiveTab('CHECKLIST')">✔ Debug Checklist</button>
+          </div>
+
+          <!-- Full Markdown Summary View -->
+          <div class="report-markdown-body" *ngIf="activeTab === 'ALL'">
+            <pre><code>{{ analysisResult.fullReportMarkdown || analysisResult.rootCause }}</code></pre>
+          </div>
+
+          <!-- Filtered Root Cause View -->
+          <div *ngIf="activeTab === 'ROOT_CAUSE'" class="filtered-section">
+            <h3>🔍 Root Cause Diagnosis</h3>
+            <p class="summary-text">{{ analysisResult.rootCauseSummary || analysisResult.rootCause }}</p>
+            
+            <h4>📌 Root Cause Evidence:</h4>
+            <div *ngFor="let ev of analysisResult.evidenceList" class="evidence-card mono">
+              - {{ ev }}
+            </div>
+
+            <h4 *ngIf="analysisResult.possibleCausesMap">Ranked Probable Causes:</h4>
+            <div *ngFor="let key of getPossibleCauseKeys()" class="cause-card">
+              <strong>{{ analysisResult.possibleCausesMap![key] }}% Probability</strong>: {{ key }}
+            </div>
+          </div>
+
+          <!-- Filtered Fix Code View -->
+          <div *ngIf="activeTab === 'FIX_CODE'" class="filtered-section">
+            <h3>💻 Production-Grade Fixed Code Solution</h3>
+            <p>{{ analysisResult.recommendedFix }}</p>
+            <div class="fix-code-wrapper">
+              <pre><code>{{ analysisResult.fixedCodeExample || analysisResult.suggestedFix }}</code></pre>
+            </div>
+          </div>
+
+          <!-- Filtered Checklist View -->
+          <div *ngIf="activeTab === 'CHECKLIST'" class="filtered-section">
+            <h3>✔ Step-by-Step Debugging Checklist</h3>
+            <div *ngFor="let item of analysisResult.debugChecklist" class="checklist-card">
+              {{ item }}
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

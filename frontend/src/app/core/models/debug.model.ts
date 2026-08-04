@@ -9,6 +9,7 @@ export interface ExceptionAnalysisResponse {
   errorMessage: string;
   severity?: string;
   confidenceScore?: number;
+  confidenceReason?: string;
   rootCauseSummary?: string;
   estimatedFixTime?: string;
   productionImpact?: string;

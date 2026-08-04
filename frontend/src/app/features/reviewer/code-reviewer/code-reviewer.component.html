@@ -131,9 +131,9 @@
           <!-- Filter Navigation Tabs -->
           <div class="filter-tab-bar">
             <button [class.active]="activeFilter === 'ALL'" (click)="setFilter('ALL')">All Findings</button>
-            <button [class.active]="activeFilter === 'SECURITY'" (click)="setFilter('SECURITY')">🛡️ Security ({{ reviewResult.securityAlerts?.length || 0 }})</button>
-            <button [class.active]="activeFilter === 'QUALITY'" (click)="setFilter('QUALITY')">🧹 Code Quality ({{ reviewResult.improvements?.length || 0 }})</button>
-            <button [class.active]="activeFilter === 'PERFORMANCE'" (click)="setFilter('PERFORMANCE')">⚡ Performance ({{ reviewResult.performanceAlerts?.length || 0 }})</button>
+            <button [class.active]="activeFilter === 'SECURITY'" (click)="setFilter('SECURITY')">🛡️ Security ({{ reviewResult.securityAlerts ? reviewResult.securityAlerts.length : 0 }})</button>
+            <button [class.active]="activeFilter === 'QUALITY'" (click)="setFilter('QUALITY')">🧹 Code Quality ({{ reviewResult.improvements ? reviewResult.improvements.length : 0 }})</button>
+            <button [class.active]="activeFilter === 'PERFORMANCE'" (click)="setFilter('PERFORMANCE')">⚡ Performance ({{ reviewResult.performanceAlerts ? reviewResult.performanceAlerts.length : 0 }})</button>
             <button [class.active]="activeFilter === 'RECOMMENDATIONS'" (click)="setFilter('RECOMMENDATIONS')">📋 Recommendations</button>
           </div>
 

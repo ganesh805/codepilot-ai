@@ -49,14 +49,18 @@ public class ExceptionDebuggerService {
             repo = repoRepository.findByUuidAndUserId(request.getRepositoryUuid(), user.getId()).orElse(null);
         }
 
-        // 1. STRICT STACK TRACE & DEEPEST CAUSE PARSING (ZERO HALLUCINATION GUARANTEE)
+        // 1. ALWAYS PARSE DEEPEST "Caused by:" EXCEPTION FOR TRUE ROOT CAUSE
         String deepestTrace = extractDeepestCauseTrace(input);
         String exceptionType = extractExceptionType(deepestTrace);
         String errorMessage = extractErrorMessage(deepestTrace);
 
+        // Strict App Stack Frame (Returns NULL if non-existent in trace)
         StackFrameAppLocation appLoc = findFirstAppStackFrame(deepestTrace);
+        if (appLoc == null) {
+            appLoc = findFirstAppStackFrame(input); // Check outer trace if deepest has no app frames
+        }
 
-        // 2. EVIDENCE-BASED DIAGNOSTIC COMPUTATION
+        // 2. KNOWLEDGE BASE EVIDENCE-BASED DIAGNOSTIC COMPUTATION
         String severity = computeSeverity(exceptionType, input);
         ConfidenceDiagnosis confidence = computeConfidence(exceptionType, errorMessage, appLoc);
         String fixTime = computeFixTime(exceptionType, severity);
@@ -64,17 +68,17 @@ public class ExceptionDebuggerService {
         String mergeRisk = (severity.equals("Critical") || severity.equals("High")) ? "Critical" : "Low";
 
         List<String> evidenceList = extractEvidence(exceptionType, errorMessage, appLoc, input);
-        Map<String, Integer> possibleCauses = computePossibleCauses(exceptionType, errorMessage, appLoc);
+        Map<String, Integer> possibleCauses = computePossibleCauses(exceptionType, errorMessage, appLoc, input);
         List<String> checklist = computeChecklist(exceptionType, errorMessage);
         List<String> technologies = computeTechnologies(exceptionType, input);
         List<String> preventiveRecs = computePreventiveRecommendations(exceptionType);
         List<String> resources = computeLearningResources(exceptionType);
 
-        String rootCauseSummary = buildRootCauseSummary(exceptionType, errorMessage, appLoc);
-        String recommendedFix = buildRecommendedFix(exceptionType, errorMessage, appLoc);
-        String fixedCodeExample = buildFixedCodeExample(exceptionType, errorMessage, appLoc);
+        String rootCauseSummary = buildRootCauseSummary(exceptionType, errorMessage, appLoc, input);
+        String recommendedFix = buildRecommendedFix(exceptionType, errorMessage, appLoc, input);
+        String fixedCodeExample = buildFixedCodeExample(exceptionType, errorMessage, appLoc, input);
 
-        List<String> timelineSteps = buildEvidenceTimeline(exceptionType, errorMessage, appLoc);
+        List<String> timelineSteps = buildEvidenceTimeline(exceptionType, errorMessage, appLoc, input);
 
         long durationMs = System.currentTimeMillis() - startTime;
 
@@ -135,7 +139,7 @@ public class ExceptionDebuggerService {
                 .collect(Collectors.toList());
     }
 
-    // --- ZERO HALLUCINATION DIAGNOSTIC HELPERS ---
+    // --- INTERNAL EXCEPTION KNOWLEDGE BASE & PARSERS ---
 
     private String extractDeepestCauseTrace(String input) {
         if (input.contains("Caused by:")) {
@@ -152,12 +156,15 @@ public class ExceptionDebuggerService {
         }
         if (input.contains("NoSuchBeanDefinitionException")) return "org.springframework.beans.factory.NoSuchBeanDefinitionException";
         if (input.contains("BeanCreationException")) return "org.springframework.beans.factory.BeanCreationException";
-        if (input.contains("SQLNonTransientConnectionException")) return "java.sql.SQLNonTransientConnectionException";
-        if (input.contains("ConstraintViolationException")) return "jakarta.validation.ConstraintViolationException";
+        if (input.contains("SQLNonTransientConnectionException") || input.contains("CommunicationsException")) return "java.sql.SQLNonTransientConnectionException";
+        if (input.contains("BadSqlGrammarException")) return "org.springframework.jdbc.BadSqlGrammarException";
+        if (input.contains("ConstraintViolationException") || input.contains("DataIntegrityViolationException")) return "jakarta.validation.ConstraintViolationException";
         if (input.contains("NullPointerException")) return "java.lang.NullPointerException";
         if (input.contains("ExpiredJwtException")) return "io.jsonwebtoken.ExpiredJwtException";
+        if (input.contains("SignatureException") || input.contains("MalformedJwtException")) return "io.jsonwebtoken.security.SignatureException";
         if (input.contains("OutOfMemoryError")) return "java.lang.OutOfMemoryError";
         if (input.contains("StackOverflowError")) return "java.lang.StackOverflowError";
+        if (input.contains("FileNotFoundException") || input.contains("NoSuchFileException")) return "java.io.FileNotFoundException";
         return "java.lang.RuntimeException";
     }
 
@@ -170,9 +177,6 @@ public class ExceptionDebuggerService {
         return lines.length > 0 ? lines[0].trim() : "Execution exception analyzed";
     }
 
-    /**
-     * Strict Application Stack Frame Parser. Returns NULL if no app frame is present.
-     */
     private StackFrameAppLocation findFirstAppStackFrame(String trace) {
         Matcher matcher = STACK_FRAME_PATTERN.matcher(trace);
         while (matcher.find()) {
@@ -181,7 +185,7 @@ public class ExceptionDebuggerService {
             String file = matcher.group(3);
             int line = Integer.parseInt(matcher.group(4));
 
-            // Filter out framework packages (Spring, JDK, Hibernate, Tomcat, Netty)
+            // Skip framework packages
             if (!className.startsWith("org.springframework") && !className.startsWith("java.") 
                     && !className.startsWith("jdk.") && !className.startsWith("org.hibernate") 
                     && !className.startsWith("org.apache") && !className.startsWith("com.sun")
@@ -189,7 +193,7 @@ public class ExceptionDebuggerService {
                 return new StackFrameAppLocation(className, method, file, line);
             }
         }
-        return null; // Return NULL instead of fake placeholders!
+        return null; // Return NULL instead of guessing!
     }
 
     private String computeSeverity(String type, String input) {
@@ -199,11 +203,12 @@ public class ExceptionDebuggerService {
                 || upper.contains("STACKOVERFLOWERROR") || upper.contains("CONNECTION REFUSED") || upper.contains("ACCESS DENIED")) {
             return "Critical";
         }
-        if (upper.contains("EXPIREDJWTEXCEPTION") || upper.contains("BADCREDENTIALSEXCEPTION") 
-                || upper.contains("SQLEXCEPTION") || upper.contains("JPASYSTEMEXCEPTION")) {
+        if (upper.contains("EXPIREDJWTEXCEPTION") || upper.contains("SIGNATUREEXCEPTION") 
+                || upper.contains("BADCREDENTIALSEXCEPTION") || upper.contains("SQLEXCEPTION") || upper.contains("BADSQLGRAMMAREXCEPTION")) {
             return "High";
         }
-        if (upper.contains("NULLPOINTEREXCEPTION") || upper.contains("ILLEGALARGUMENTEXCEPTION") || upper.contains("CONSTRAINTVIOLATIONEXCEPTION")) {
+        if (upper.contains("NULLPOINTEREXCEPTION") || upper.contains("ILLEGALARGUMENTEXCEPTION") 
+                || upper.contains("CONSTRAINTVIOLATIONEXCEPTION") || upper.contains("FILENOTFOUNDEXCEPTION")) {
             return "Medium";
         }
         return "Low";
@@ -212,8 +217,9 @@ public class ExceptionDebuggerService {
     private ConfidenceDiagnosis computeConfidence(String type, String msg, StackFrameAppLocation appLoc) {
         String msgLower = msg.toLowerCase();
         if (msgLower.contains("access denied") || msgLower.contains("connection refused") 
-                || type.contains("ExpiredJwtException") || type.contains("NoSuchBeanDefinitionException")) {
-            return new ConfidenceDiagnosis(100, "Exact root cause exception pattern extracted directly from exception message.");
+                || type.contains("ExpiredJwtException") || type.contains("NoSuchBeanDefinitionException")
+                || type.contains("SignatureException") || type.contains("OutOfMemoryError")) {
+            return new ConfidenceDiagnosis(100, "Exact exception type and error message signature extracted directly from exception payload.");
         }
         if (appLoc != null) {
             return new ConfidenceDiagnosis(95, String.format("Application stack frame '%s:%d' identified in trace.", appLoc.file, appLoc.lineNumber));
@@ -228,10 +234,27 @@ public class ExceptionDebuggerService {
     }
 
     private String computeProductionImpact(String type, String msg, String severity) {
-        if (severity.equals("Critical")) return "Application Startup or Infrastructure Failure! Services cannot boot or accept API traffic.";
-        if (type.contains("NullPointerException")) return "API HTTP 500 Server Error served to users during request execution.";
-        if (type.contains("ExpiredJwtException")) return "Authentication Failure! Client JWT Bearer token expired, rejecting API requests.";
-        if (type.contains("ConstraintViolationException")) return "Data Integrity Violation! Database transaction rollback executed.";
+        if (type.contains("NoSuchBeanDefinitionException") || type.contains("BeanCreationException")) {
+            return "Application Startup Failure! Spring IoC Container failed to initialize required beans.";
+        }
+        if (type.contains("SQLNonTransientConnectionException") || msg.toLowerCase().contains("access denied")) {
+            return "Database Infrastructure Unavailable! Database connection or authentication failed.";
+        }
+        if (type.contains("BadSqlGrammarException")) {
+            return "Database Query Failure! Invalid SQL statement executed, resulting in transaction rollback.";
+        }
+        if (type.contains("NullPointerException")) {
+            return "API HTTP 500 Server Error served to users during request execution.";
+        }
+        if (type.contains("ExpiredJwtException") || type.contains("SignatureException")) {
+            return "Authentication Failure! Client JWT Bearer token rejected.";
+        }
+        if (type.contains("OutOfMemoryError")) {
+            return "JVM Crash / OutOfMemoryError! Java Heap Memory exhausted.";
+        }
+        if (type.contains("StackOverflowError")) {
+            return "Thread Crash / StackOverflowError! Infinite recursion exceeded thread call stack size.";
+        }
         return "Operational Exception or Business Processing Error.";
     }
 
@@ -249,50 +272,86 @@ public class ExceptionDebuggerService {
         return list;
     }
 
-    private Map<String, Integer> computePossibleCauses(String type, String msg, StackFrameAppLocation appLoc) {
+    // --- KNOWLEDGE BASE: POSSIBLE CAUSES ---
+    private Map<String, Integer> computePossibleCauses(String type, String msg, StackFrameAppLocation appLoc, String rawInput) {
         Map<String, Integer> map = new LinkedHashMap<>();
         String msgLower = msg.toLowerCase();
 
         if (type.contains("NoSuchBeanDefinitionException")) {
-            map.put("Target bean class missing @Service, @Repository, or @Component annotation", 100);
-            map.put("Spring @ComponentScan boundary excluding required domain package", 90);
-        } else if (type.contains("BeanCreationException")) {
-            map.put("Unsatisfied dependency or circular reference during Spring Bean initialization", 95);
-            map.put("Configuration property error in application.properties or application.yml", 85);
-        } else if (msgLower.contains("access denied") || type.contains("SQLNonTransientConnectionException")) {
+            if (msg.contains("PasswordEncoder")) {
+                map.put("Missing PasswordEncoder @Bean definition in SecurityConfig or AppConfig", 100);
+            } else {
+                map.put("Missing Spring @Service, @Repository, or @Component annotation on target class", 95);
+                map.put("Spring @ComponentScan boundary excluding target package", 85);
+            }
+        } else if (type.contains("SQLNonTransientConnectionException") || msgLower.contains("access denied") || msgLower.contains("connection refused")) {
             map.put("Incorrect database username or password in application.properties / application.yml", 100);
-            map.put("Database user lacks CONNECT or SELECT privileges on target schema", 85);
+            map.put("Database server offline, container stopped, or firewall blocking port", 90);
+        } else if (type.contains("BadSqlGrammarException")) {
+            map.put("SQL Syntax Error in query string or column/table name mismatch", 100);
+        } else if (type.contains("ConstraintViolationException")) {
+            map.put("Database unique constraint, foreign key, or non-null column constraint violation", 100);
         } else if (type.contains("NullPointerException")) {
-            map.put("Missing Spring @Autowired / Dependency Injection annotation on target field", 95);
-            map.put("Target class instantiated manually via 'new' operator bypassing Spring IoC Container", 90);
+            if (msg.contains("is null")) {
+                map.put(String.format("Null Object Dereference: %s", msg), 100);
+            } else {
+                map.put("Uninitialized variable or missing Spring constructor injection", 90);
+            }
         } else if (type.contains("ExpiredJwtException")) {
             map.put("JWT Bearer token expiration timestamp (exp claim) passed valid lifetime window", 100);
-        } else if (type.contains("ConstraintViolationException")) {
-            map.put("Database table foreign key constraint or unique column constraint violation", 95);
+        } else if (type.contains("SignatureException")) {
+            map.put("JWT signature secret key mismatch between issuing server and validator", 100);
+        } else if (type.contains("OutOfMemoryError")) {
+            map.put("Java Heap Memory exhausted due to memory leak or unpaginated large dataset query", 100);
+        } else if (type.contains("StackOverflowError")) {
+            map.put("Infinite recursive method call without base termination condition", 100);
+        } else if (type.contains("FileNotFoundException")) {
+            map.put("File does not exist at specified path or application lacks read permissions", 100);
         } else {
             map.put("Unhandled runtime execution boundary failure", 85);
         }
         return map;
     }
 
+    // --- KNOWLEDGE BASE: CHECKLIST ---
     private List<String> computeChecklist(String type, String msg) {
         List<String> list = new ArrayList<>();
         String msgLower = msg.toLowerCase();
 
-        if (type.contains("NoSuchBeanDefinitionException") || type.contains("BeanCreationException")) {
-            list.add("✔ Verify target Spring class has `@Service`, `@Repository`, or `@Component` annotation");
-            list.add("✔ Ensure class uses Spring Constructor Injection instead of `new`");
-            list.add("✔ Check `@ComponentScan` package boundaries in main application class");
-        } else if (msgLower.contains("access denied") || type.contains("SQLNonTransientConnectionException")) {
+        if (type.contains("NoSuchBeanDefinitionException")) {
+            if (msg.contains("PasswordEncoder")) {
+                list.add("✔ Define `@Bean public PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }` in SecurityConfig");
+            } else {
+                list.add("✔ Verify target class is annotated with `@Service`, `@Repository`, or `@Component`");
+                list.add("✔ Check `@ComponentScan` package boundaries in application main class");
+            }
+        } else if (type.contains("SQLNonTransientConnectionException") || msgLower.contains("access denied") || msgLower.contains("connection refused")) {
             list.add("✔ Verify `spring.datasource.username` and `spring.datasource.password` in application.properties");
-            list.add("✔ Confirm database container / service is running and accepting port connections");
-            list.add("✔ Verify database user privileges on target schema");
+            list.add("✔ Confirm database container / service is running on target port");
+            list.add("✔ Verify database user permissions on target schema");
+        } else if (type.contains("BadSqlGrammarException")) {
+            list.add("✔ Inspect SQL query string for syntax errors, reserved keywords, or missing commas");
+            list.add("✔ Verify table and column names match database schema");
+        } else if (type.contains("ConstraintViolationException")) {
+            list.add("✔ Check database table constraints (UNIQUE, FOREIGN KEY, NOT NULL)");
+            list.add("✔ Add validation checks before persisting entity");
         } else if (type.contains("NullPointerException")) {
-            list.add("✔ Verify target repository or service field is injected via constructor injection");
-            list.add("✔ Inspect target line number in application code for null dereference");
+            list.add("✔ Inspect exception line number for uninitialized object reference");
+            list.add("✔ Ensure Spring components use Constructor Injection for dependencies");
         } else if (type.contains("ExpiredJwtException")) {
-            list.add("✔ Verify JWT `exp` expiration claim duration");
-            list.add("✔ Ensure client refreshes access tokens prior to expiration");
+            list.add("✔ Verify JWT token expiration duration setting (`exp` claim)");
+            list.add("✔ Implement client-side refresh token flow");
+        } else if (type.contains("SignatureException")) {
+            list.add("✔ Verify `jwt.secret` configuration in application.properties matches auth server");
+        } else if (type.contains("OutOfMemoryError")) {
+            list.add("✔ Use pagination (`Pageable`) for large database queries");
+            list.add("✔ Analyze JVM Heap Dump using Eclipse MAT or VisualVM");
+        } else if (type.contains("StackOverflowError")) {
+            list.add("✔ Inspect call stack for repeating recursive method calls");
+            list.add("✔ Ensure recursive methods have valid base termination conditions");
+        } else if (type.contains("FileNotFoundException")) {
+            list.add("✔ Verify target file path exists");
+            list.add("✔ Check file read/write permissions for process user");
         } else {
             list.add("✔ Verify application configuration and method parameters");
         }
@@ -302,63 +361,159 @@ public class ExceptionDebuggerService {
     private List<String> computeTechnologies(String type, String input) {
         List<String> tech = new ArrayList<>();
         tech.add("Java 21");
-        tech.add("Spring Boot 3.3");
-        if (input.contains("sql") || input.contains("jdbc") || type.contains("SQL")) tech.add("MySQL / PostgreSQL");
+        if (type.contains("Bean") || type.contains("NoSuchBean")) tech.add("Spring Boot 3.3");
+        if (input.contains("sql") || input.contains("jdbc") || type.contains("SQL") || type.contains("BadSql")) tech.add("MySQL / PostgreSQL");
         if (input.contains("jpa") || input.contains("hibernate") || type.contains("ConstraintViolation")) tech.add("Spring Data JPA");
-        if (type.contains("Jwt")) tech.add("Spring Security & JWT");
+        if (type.contains("Jwt") || type.contains("Signature")) tech.add("Spring Security & JWT");
         return tech;
     }
 
     private List<String> computePreventiveRecommendations(String type) {
+        if (type.contains("SQLNonTransientConnectionException") || type.contains("BadSqlGrammarException")) {
+            return Arrays.asList(
+                    "Use Flyway or Liquibase database migration scripts to enforce consistent schema DDL.",
+                    "Configure HikariCP connection pool health checks (`connection-test-query`)."
+            );
+        }
+        if (type.contains("ExpiredJwtException") || type.contains("SignatureException")) {
+            return Arrays.asList(
+                    "Implement OAuth2 / JWT Refresh Token flow for seamless token renewal.",
+                    "Store JWT secret keys in secure environment variables or vault."
+            );
+        }
+        if (type.contains("OutOfMemoryError") || type.contains("StackOverflowError")) {
+            return Arrays.asList(
+                    "Set appropriate JVM Heap limits (`-Xmx2g`) and configure GC logging.",
+                    "Refactor deep recursion into iterative loops."
+            );
+        }
         return Arrays.asList(
-                "Use Spring Constructor Injection with `final` fields to guarantee non-null initialization at startup.",
-                "Implement a `@RestControllerAdvice` Global Exception Handler for standardized JSON error responses.",
-                "Enforce integration tests covering database authentication and token expiration scenarios."
+                "Use Spring Constructor Injection with `final` fields to guarantee non-null bean initialization.",
+                "Implement `@RestControllerAdvice` Global Exception Handler for standardized API error responses."
         );
     }
 
     private List<String> computeLearningResources(String type) {
-        return Arrays.asList(
-                "Spring Framework Reference: Dependency Injection & Application Context",
-                "Oracle Java Documentation: Exception Handling Best Practices",
-                "Spring Data JPA & JDBC Database Connection Configuration Guide"
-        );
+        if (type.contains("SQL") || type.contains("BadSql")) {
+            return Arrays.asList("Spring JDBC & HikariCP Configuration Guide", "MySQL / PostgreSQL SQL Syntax Reference");
+        }
+        if (type.contains("Jwt") || type.contains("Signature")) {
+            return Arrays.asList("Spring Security JWT Authentication Guide", "jjwt Library Documentation");
+        }
+        return Arrays.asList("Spring Framework Reference: Dependency Injection", "Oracle Java Exception Handling Guide");
     }
 
-    private String buildRootCauseSummary(String type, String msg, StackFrameAppLocation appLoc) {
+    // --- KNOWLEDGE BASE: ROOT CAUSE SUMMARY ---
+    private String buildRootCauseSummary(String type, String msg, StackFrameAppLocation appLoc, String rawInput) {
         if (type.contains("NoSuchBeanDefinitionException")) {
-            return "NoSuchBeanDefinitionException: Spring IoC container could not find a matching bean definition.";
+            if (msg.contains("PasswordEncoder")) {
+                return "NoSuchBeanDefinitionException: No qualifying bean of type 'org.springframework.security.crypto.password.PasswordEncoder' available.";
+            }
+            return String.format("NoSuchBeanDefinitionException: No qualifying bean available for requested type in Spring context (%s).", msg);
         }
         if (type.contains("BeanCreationException")) {
-            return "BeanCreationException: Spring Boot application startup failed during bean instantiation.";
+            if (rawInput.contains("Access denied")) {
+                return "Database Authentication Failure: Access denied for database user specified in spring.datasource.";
+            }
+            return String.format("BeanCreationException: Spring failed to create bean due to nested exception: %s", msg);
         }
-        if (type.contains("SQLNonTransientConnectionException") || msg.contains("Access denied")) {
+        if (type.contains("SQLNonTransientConnectionException") || msg.toLowerCase().contains("access denied") || msg.toLowerCase().contains("connection refused")) {
             return String.format("Database Connection Failure: %s", msg);
         }
+        if (type.contains("BadSqlGrammarException")) {
+            return String.format("BadSqlGrammarException: SQL syntax error in query statement (%s).", msg);
+        }
+        if (type.contains("ConstraintViolationException")) {
+            return String.format("ConstraintViolationException: Database constraint violated (%s).", msg);
+        }
         if (type.contains("NullPointerException")) {
+            if (msg.contains("is null")) {
+                return String.format("NullPointerException: %s", msg);
+            }
             return String.format("NullPointerException in %s: Invoking a method on an uninitialized null reference.", 
                     appLoc != null ? appLoc.file + ":" + appLoc.lineNumber : "application code");
+        }
+        if (type.contains("ExpiredJwtException")) {
+            return "ExpiredJwtException: JWT Bearer token timestamp (exp claim) has expired.";
+        }
+        if (type.contains("SignatureException")) {
+            return "SignatureException: JWT signature validation failed due to secret key mismatch or token tampering.";
+        }
+        if (type.contains("OutOfMemoryError")) {
+            return "OutOfMemoryError: Java Heap Memory space exhausted.";
+        }
+        if (type.contains("StackOverflowError")) {
+            return "StackOverflowError: Infinite recursion exceeded thread execution stack size.";
+        }
+        if (type.contains("FileNotFoundException")) {
+            return String.format("FileNotFoundException: Cannot find target file (%s).", msg);
         }
         return String.format("%s: %s", type, msg);
     }
 
-    private String buildRecommendedFix(String type, String msg, StackFrameAppLocation appLoc) {
-        if (type.contains("NoSuchBeanDefinitionException") || type.contains("BeanCreationException")) {
-            return "Evidence: Missing Bean Definition. Remedy: Annotate target class with `@Service` or `@Repository` and verify `@ComponentScan` packages.";
+    // --- KNOWLEDGE BASE: RECOMMENDED FIX ---
+    private String buildRecommendedFix(String type, String msg, StackFrameAppLocation appLoc, String rawInput) {
+        if (type.contains("NoSuchBeanDefinitionException")) {
+            if (msg.contains("PasswordEncoder")) {
+                return "Evidence: 'No qualifying bean of type PasswordEncoder'. Remedy: Define a PasswordEncoder @Bean in your SecurityConfig class.";
+            }
+            return String.format("Evidence: 'No qualifying bean of type %s'. Remedy: Annotate the class with @Component, @Service, or @Repository, or define a @Bean method.", msg);
         }
-        if (type.contains("SQLNonTransientConnectionException") || msg.contains("Access denied")) {
-            return "Evidence: Database connection error. Remedy: Update `spring.datasource.username` and `spring.datasource.password` in application.properties.";
+        if (type.contains("SQLNonTransientConnectionException") || msg.toLowerCase().contains("access denied") || rawInput.contains("Access denied")) {
+            return "Evidence: 'Access denied for user'. Remedy: Update `spring.datasource.username` and `spring.datasource.password` in application.properties to match database credentials.";
+        }
+        if (msg.toLowerCase().contains("connection refused")) {
+            return "Evidence: 'Connection refused'. Remedy: Start the database container/service and verify host and port in application.properties.";
+        }
+        if (type.contains("BadSqlGrammarException")) {
+            return "Evidence: SQL Syntax Error. Remedy: Correct the SQL query syntax, column names, or table names in your repository query.";
+        }
+        if (type.contains("ConstraintViolationException")) {
+            return "Evidence: Database constraint violation. Remedy: Add duplicate/validation checks before saving entity to avoid constraint failure.";
         }
         if (type.contains("NullPointerException")) {
-            return "Evidence: Null reference dereference. Remedy: Refactor target class to use Spring Constructor Injection with `final` fields.";
+            if (msg.contains("is null")) {
+                return String.format("Evidence: '%s'. Remedy: Ensure the field is injected via Spring Constructor Injection with 'final' keyword.", msg);
+            }
+            return "Evidence: Null reference dereference. Remedy: Ensure target class uses Spring Constructor Injection instead of 'new'.";
         }
-        return "Evidence: Exception in trace. Remedy: Enclose boundary in structured try-catch handling and log exact error message.";
+        if (type.contains("ExpiredJwtException")) {
+            return "Evidence: 'JWT expired'. Remedy: Client must initiate refresh token flow to acquire a new valid JWT access token.";
+        }
+        if (type.contains("SignatureException")) {
+            return "Evidence: 'JWT signature does not match'. Remedy: Ensure `jwt.secret` in application.properties matches the secret key used by the issuing server.";
+        }
+        if (type.contains("OutOfMemoryError")) {
+            return "Evidence: 'Java heap space'. Remedy: Implement pagination for queries, avoid loading large datasets into memory, or increase JVM heap (-Xmx).";
+        }
+        if (type.contains("StackOverflowError")) {
+            return "Evidence: Recursive call stack exhaustion. Remedy: Add a base termination condition to stop infinite recursion.";
+        }
+        if (type.contains("FileNotFoundException")) {
+            return "Evidence: File path missing. Remedy: Check file path, file existence, and read permissions.";
+        }
+        return "Evidence: Exception in stack trace. Remedy: Enclose execution in try-catch handling and log detailed error message.";
     }
 
-    private String buildFixedCodeExample(String type, String msg, StackFrameAppLocation appLoc) {
+    // --- KNOWLEDGE BASE: FIXED CODE EXAMPLES ---
+    private String buildFixedCodeExample(String type, String msg, StackFrameAppLocation appLoc, String rawInput) {
+        if (type.contains("NoSuchBeanDefinitionException") && msg.contains("PasswordEncoder")) {
+            return """
+                   // 🟢 FIXED CODE (SecurityConfig.java):
+                   @Configuration
+                   @EnableWebSecurity
+                   public class SecurityConfig {
+
+                       @Bean
+                       public PasswordEncoder passwordEncoder() {
+                           return new BCryptPasswordEncoder();
+                       }
+                   }
+                   """;
+        }
         if (type.contains("NoSuchBeanDefinitionException") || type.contains("NullPointerException")) {
             return """
-                   // 🟢 FIXED CODE (Spring Boot Constructor Injection & Service Annotation):
+                   // 🟢 FIXED CODE (Spring Boot Constructor Injection):
                    @Service
                    public class UserService {
 
@@ -374,7 +529,8 @@ public class ExceptionDebuggerService {
                        }
                    }
                    """;
-        } else {
+        }
+        if (type.contains("SQLNonTransientConnectionException") || rawInput.contains("Access denied")) {
             return """
                    # 🟢 FIXED CONFIGURATION (application.properties):
                    spring.datasource.url=jdbc:mysql://localhost:3306/taskmanager_db?useSSL=false&serverTimezone=UTC
@@ -383,16 +539,64 @@ public class ExceptionDebuggerService {
                    spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
                    """;
         }
+        if (type.contains("BadSqlGrammarException")) {
+            return """
+                   // 🟢 FIXED REPOSITORY QUERY (UserRepository.java):
+                   @Query("SELECT u FROM User u WHERE u.username = :username") // Corrected JPQL Syntax
+                   Optional<User> findByUsername(@Param("username") String username);
+                   """;
+        }
+        if (type.contains("ExpiredJwtException") || type.contains("SignatureException")) {
+            return """
+                   // 🟢 FIXED CODE (JwtAuthenticationFilter.java):
+                   try {
+                       String token = parseJwt(request);
+                       if (token != null && tokenProvider.validateToken(token)) {
+                           // Authenticate user session...
+                       }
+                   } catch (ExpiredJwtException ex) {
+                       log.warn("JWT Session Expired: {}", ex.getMessage());
+                       response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                       response.setContentType("application/json");
+                       response.getWriter().write("{\\"error\\": \\"JWT Session Expired\\", \\"code\\": 401}");
+                       return;
+                   }
+                   """;
+        }
+        if (type.contains("StackOverflowError")) {
+            return """
+                   // 🟢 FIXED RECURSIVE METHOD:
+                   public int calculateFactorial(int n) {
+                       // Base termination condition to prevent StackOverflowError
+                       if (n <= 1) {
+                           return 1;
+                       }
+                       return n * calculateFactorial(n - 1);
+                   }
+                   """;
+        }
+        return """
+               // 🟢 FIXED CODE:
+               try {
+                   // Execute domain operation...
+               } catch (Exception ex) {
+                   log.error("Operation failed: {}", ex.getMessage(), ex);
+                   throw new ServiceOperationException("Operation failed: " + ex.getMessage());
+               }
+               """;
     }
 
-    private List<String> buildEvidenceTimeline(String type, String msg, StackFrameAppLocation appLoc) {
+    private List<String> buildEvidenceTimeline(String type, String msg, StackFrameAppLocation appLoc, String rawInput) {
         List<String> steps = new ArrayList<>();
         steps.add("Exception: " + type);
-        if (appLoc != null) {
+        if (rawInput.contains("Access denied")) {
+            steps.add("JDBC Driver ➔ Access Denied ('root'@'localhost') ➔ Fix Database Credentials");
+        } else if (msg.contains("PasswordEncoder")) {
+            steps.add("Spring Security Context ➔ Missing PasswordEncoder @Bean ➔ Define BCryptPasswordEncoder");
+        } else if (appLoc != null) {
             steps.add("File: " + appLoc.file);
             steps.add("Line " + appLoc.lineNumber + " (" + appLoc.methodName + ")");
             steps.add("Class: " + appLoc.className);
-            steps.add("Fix: Apply Spring Constructor Injection");
         } else {
             steps.add("Framework Execution Boundary ➔ N/A App Frame ➔ Inspect Exception Message");
         }

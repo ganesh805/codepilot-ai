@@ -12,8 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -46,55 +45,187 @@ public class CodeReviewerEngine {
         }
 
         List<String> securityAlerts = new ArrayList<>();
-        List<String> improvements = new ArrayList<>();
+        List<String> codeQualityIssues = new ArrayList<>();
+        List<String> performanceIssues = new ArrayList<>();
+        List<String> positiveObservations = new ArrayList<>();
+        Set<String> seenIssues = new HashSet<>();
 
         String[] lines = diff.split("\\r?\\n");
+        int currentLineNum = 0;
+
         for (String line : lines) {
+            currentLineNum++;
             String trimmed = line.trim();
+
+            // Track line numbers in unified diff headers
+            if (trimmed.startsWith("@@")) {
+                continue;
+            }
+
+            // Only process added lines (+) and ignore deleted (-) or file headers (+++)
             if (trimmed.startsWith("+") && !trimmed.startsWith("+++")) {
                 String addedCode = trimmed.substring(1).trim();
+
+                // 1. FILTER COMMENTS & DOCUMENTATION (Ignore non-executable text)
+                if (isCommentOrDoc(addedCode)) {
+                    continue;
+                }
+
                 String codeUpper = addedCode.toUpperCase();
 
-                // 1. OWASP A02: Hardcoded Secrets & Credentials
-                if (codeUpper.contains("KEY =") || codeUpper.contains("SECRET =") || codeUpper.contains("PASSWORD =") 
-                        || codeUpper.contains("TOKEN =") || codeUpper.contains("AWS_") || codeUpper.contains("JWT_")) {
-                    if (addedCode.contains("\"") || addedCode.contains("'")) {
-                        securityAlerts.add("🚨 OWASP A02 HARDCODED SECRET: Hardcoded credential or API secret key detected in line: `" + addedCode + "`. Store credentials in Environment Variables or Secrets Manager!");
+                // 2. OWASP SECURITY CHECKS (Vulnerabilities only)
+                
+                // OWASP A03:2021 - Injection (CWE-89: SQL Injection)
+                if ((codeUpper.contains("SELECT ") || codeUpper.contains("UPDATE ") || codeUpper.contains("DELETE ")) && addedCode.contains("+")) {
+                    String key = "SQL_INJECTION:" + addedCode;
+                    if (seenIssues.add(key)) {
+                        securityAlerts.add(String.format(
+                                "🚨 [CRITICAL] OWASP A03:2021 - Injection (CWE-89: SQL Injection)\n" +
+                                "  • Confidence: HIGH | Line %d: `%s`\n" +
+                                "  • Impact: Attacker can manipulate database queries to dump or destroy sensitive data.\n" +
+                                "  • Fix: Use Parameterized PreparedStatement or Spring Data JPA `@Query(\"... WHERE u.name = :name\")`.\n" +
+                                "  • Secure Code:\n" +
+                                "    ```java\n" +
+                                "    String sql = \"SELECT * FROM users WHERE username = ?\";\n" +
+                                "    return jdbcTemplate.queryForObject(sql, new Object[]{username}, User.class);\n" +
+                                "    ```",
+                                currentLineNum, addedCode
+                        ));
                     }
                 }
 
-                // 2. OWASP A03: SQL Injection via Dynamic String Concatenation
-                if ((codeUpper.contains("SELECT ") || codeUpper.contains("UPDATE ") || codeUpper.contains("DELETE ")) && addedCode.contains("+")) {
-                    securityAlerts.add("🚨 OWASP A03 CRITICAL SQL INJECTION: Dynamic String concatenation detected in SQL query: `" + addedCode + "`. Use Parameterized PreparedStatement or JPA Named Parameters!");
-                } else if (addedCode.contains("executeQuery(") && addedCode.contains("+")) {
-                    securityAlerts.add("🚨 OWASP A03 SQL INJECTION RISK: Dynamic SQL execution: `" + addedCode + "`.");
+                // OWASP A02:2021 - Cryptographic Failures (CWE-798: Use of Hardcoded Credentials)
+                if ((codeUpper.contains("KEY =") || codeUpper.contains("SECRET =") || codeUpper.contains("PASSWORD =") || codeUpper.contains("TOKEN =")) 
+                        && (addedCode.contains("\"") || addedCode.contains("'"))) {
+                    String key = "HARDCODED_SECRET:" + addedCode;
+                    if (seenIssues.add(key)) {
+                        securityAlerts.add(String.format(
+                                "🚨 [HIGH] OWASP A02:2021 - Cryptographic Failures (CWE-798: Use of Hard-coded Credentials)\n" +
+                                "  • Confidence: HIGH | Line %d: `%s`\n" +
+                                "  • Impact: Hardcoded secrets in source control allow unauthorized system access.\n" +
+                                "  • Fix: Store secrets in Environment Variables or Key Vault (`@Value(\"${jwt.secret}\")`).\n" +
+                                "  • Secure Code:\n" +
+                                "    ```java\n" +
+                                "    @Value(\"${aws.secret.key}\")\n" +
+                                "    private String awsSecretKey;\n" +
+                                "    ```",
+                                currentLineNum, addedCode
+                        ));
+                    }
                 }
 
-                // 3. OWASP A02: Insecure Cryptography (MD5 / DES)
+                // OWASP A02:2021 - Cryptographic Failures (CWE-327: Broken Crypto Algorithm)
                 if (codeUpper.contains("MD5") || codeUpper.contains("DES")) {
-                    securityAlerts.add("⚠️ OWASP A02 WEAK CRYPTOGRAPHY: Deprecated hashing/cipher algorithm (MD5/DES) detected in line: `" + addedCode + "`. Use SHA-256 or BCrypt!");
+                    String key = "WEAK_CRYPTO:" + addedCode;
+                    if (seenIssues.add(key)) {
+                        securityAlerts.add(String.format(
+                                "🚨 [HIGH] OWASP A02:2021 - Cryptographic Failures (CWE-327: Use of a Broken Cryptographic Algorithm)\n" +
+                                "  • Confidence: HIGH | Line %d: `%s`\n" +
+                                "  • Impact: MD5 and DES algorithms are susceptible to fast collision attacks and cracking.\n" +
+                                "  • Fix: Upgrade to BCryptPasswordEncoder or Argon2.\n" +
+                                "  • Secure Code:\n" +
+                                "    ```java\n" +
+                                "    PasswordEncoder encoder = new BCryptPasswordEncoder();\n" +
+                                "    String hash = encoder.encode(rawPassword);\n" +
+                                "    ```",
+                                currentLineNum, addedCode
+                        ));
+                    }
                 }
 
-                // 4. OWASP A05: Permissive CORS Configuration
+                // OWASP A05:2021 - Security Misconfiguration (CWE-942: Permissive CORS)
                 if (addedCode.contains("@CrossOrigin(\"*\")") || addedCode.contains("allowedOrigins(\"*\")")) {
-                    securityAlerts.add("⚠️ OWASP A05 SECURITY MISCONFIGURATION: Permissive Wildcard CORS (`*`) detected. Restrict allowed origins to trusted domains!");
+                    String key = "PERMISSIVE_CORS:" + addedCode;
+                    if (seenIssues.add(key)) {
+                        securityAlerts.add(String.format(
+                                "⚠️ [MEDIUM] OWASP A05:2021 - Security Misconfiguration (CWE-942: Permissive CORS Wildcard)\n" +
+                                "  • Confidence: HIGH | Line %d: `%s`\n" +
+                                "  • Impact: Allows any malicious website to issue cross-origin requests to your API.\n" +
+                                "  • Fix: Restrict allowed origins to specific trusted domains (`allowedOrigins(\"https://app.com\")`).",
+                                currentLineNum, addedCode
+                        ));
+                    }
                 }
 
-                // 5. Code Quality Check: System.out.println / console.log
+                // 3. CODE QUALITY CHECKS (Non-security maintainability issues)
+                if (addedCode.contains("throws Exception") || addedCode.contains("catch (Exception e)")) {
+                    String key = "GENERIC_EXCEPTION:" + addedCode;
+                    if (seenIssues.add(key)) {
+                        codeQualityIssues.add(String.format("🧹 Line %d: Avoid generic `Exception`. Catch specific exceptions (e.g. `UserNotFoundException`, `SQLException`) for robust error handling.", currentLineNum));
+                    }
+                }
+
+                if (addedCode.contains("new String(") && !addedCode.contains("StandardCharsets")) {
+                    String key = "NEW_STRING_BYTES:" + addedCode;
+                    if (seenIssues.add(key)) {
+                        codeQualityIssues.add(String.format("🧹 Line %d: `new String(bytes)` uses default platform charset. Explicitly specify `StandardCharsets.UTF_8`.", currentLineNum));
+                    }
+                }
+
                 if (addedCode.contains("System.out.println") || addedCode.contains("console.log")) {
-                    improvements.add("💡 LOGGING BEST PRACTICE: Replace raw `System.out.println`/`console.log` with SLF4J Logger (`log.info(...)`)");
+                    String key = "RAW_LOGGING:" + addedCode;
+                    if (seenIssues.add(key)) {
+                        codeQualityIssues.add(String.format("🧹 Line %d: Replace raw console print statements with SLF4J Logger (`log.info(...)` or `log.error(...)`).", currentLineNum));
+                    }
+                }
+
+                // 4. PERFORMANCE CHECKS
+                if (addedCode.contains("for (") || addedCode.contains("while (")) {
+                    if (addedCode.contains("+=")) {
+                        String key = "STRING_CONCAT_LOOP:" + addedCode;
+                        if (seenIssues.add(key)) {
+                            performanceIssues.add(String.format("⚡ Line %d: String concatenation inside loops allocates multiple temporary objects. Use `StringBuilder`.", currentLineNum));
+                        }
+                    }
+                }
+
+                // 5. POSITIVE OBSERVATIONS (Good engineering practices detected)
+                if (addedCode.contains("BCryptPasswordEncoder") || addedCode.contains("passwordEncoder.matches")) {
+                    String key = "POS_BCRYPT";
+                    if (seenIssues.add(key)) {
+                        positiveObservations.add("✨ POSITIVE: Using industry-standard BCrypt password hashing.");
+                    }
+                }
+                if (addedCode.contains("PreparedStatement") || addedCode.contains("jdbcTemplate.query(")) {
+                    String key = "POS_PREPARED_STMT";
+                    if (seenIssues.add(key)) {
+                        positiveObservations.add("✨ POSITIVE: Utilizing Parameterized SQL queries preventing SQL Injection.");
+                    }
+                }
+                if (addedCode.contains("@Autowired") || addedCode.contains("final ") && addedCode.contains("Repository")) {
+                    String key = "POS_DI";
+                    if (seenIssues.add(key)) {
+                        positiveObservations.add("✨ POSITIVE: Following Spring Dependency Injection & immutability practices.");
+                    }
                 }
             }
         }
 
-        if (improvements.isEmpty() && securityAlerts.isEmpty()) {
-            improvements.add("✅ CLEAN CODE: Standard formatting, valid naming conventions, and proper layer decoupling observed.");
+        if (positiveObservations.isEmpty()) {
+            positiveObservations.add("✨ POSITIVE: Code conforms to standard Java 21 & Spring Boot modular structure.");
         }
 
-        int securityCount = securityAlerts.size();
-        int score = Math.max(0, 100 - (securityCount * 25) - (improvements.size() * 5));
+        // Calculate Realistic Quality Scorecard
+        int criticalCount = (int) securityAlerts.stream().filter(a -> a.contains("[CRITICAL]")).count();
+        int highCount = (int) securityAlerts.stream().filter(a -> a.contains("[HIGH]")).count();
+        int mediumCount = (int) securityAlerts.stream().filter(a -> a.contains("[MEDIUM]")).count();
+        int lowCount = (int) securityAlerts.stream().filter(a -> a.contains("[LOW]")).count();
 
-        String summary = generateReviewSummary(prTitle, score, securityCount, securityAlerts, improvements);
+        int deductions = (criticalCount * 25) + (highCount * 15) + (mediumCount * 10) + (lowCount * 5)
+                + (codeQualityIssues.size() * 4) + (performanceIssues.size() * 3);
+        int score = Math.max(15, 100 - deductions);
+
+        // Determine Merge Recommendation
+        String mergeRecommendation;
+        if (criticalCount > 0 || highCount > 0) {
+            mergeRecommendation = "🚨 BLOCK MERGE (Critical Security Vulnerabilities Detected)";
+        } else if (mediumCount > 0 || codeQualityIssues.size() > 2) {
+            mergeRecommendation = "⚠️ REQUEST CHANGES (Security / Code Quality Issues Present)";
+        } else {
+            mergeRecommendation = "🟢 APPROVE MERGE (Pull Request Passes Quality & Security Audit)";
+        }
+
+        String summary = generateStructuredReviewReport(prTitle, score, mergeRecommendation, securityAlerts, codeQualityIssues, performanceIssues, positiveObservations);
 
         CodeReview entity = CodeReview.builder()
                 .user(user)
@@ -102,7 +233,7 @@ public class CodeReviewerEngine {
                 .prTitle(prTitle)
                 .gitDiff(diff)
                 .qualityScore(score)
-                .securityIssuesCount(securityCount)
+                .securityIssuesCount(securityAlerts.size())
                 .summary(summary)
                 .build();
 
@@ -115,7 +246,7 @@ public class CodeReviewerEngine {
                 .securityIssuesCount(saved.getSecurityIssuesCount())
                 .summary(saved.getSummary())
                 .securityAlerts(securityAlerts)
-                .improvements(improvements)
+                .improvements(codeQualityIssues)
                 .createdAt(saved.getCreatedAt())
                 .build();
     }
@@ -127,25 +258,73 @@ public class CodeReviewerEngine {
                 .collect(Collectors.toList());
     }
 
-    private String generateReviewSummary(String title, int score, int securityCount, List<String> alerts, List<String> improvements) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(String.format("### Code Review Summary: **%s**\n\n", title));
-        sb.append(String.format("- **Overall Quality Score**: `%d / 100`\n", score));
-        sb.append(String.format("- **Security Alerts**: `%d Security Vulnerabilities`\n\n", securityCount));
+    private boolean isCommentOrDoc(String code) {
+        if (code.startsWith("//") || code.startsWith("/*") || code.startsWith("*") || code.startsWith("*/") 
+                || code.startsWith("#") || code.startsWith("<!--") || code.startsWith("@param") || code.startsWith("@return")) {
+            return true;
+        }
+        return false;
+    }
 
-        if (securityCount > 0) {
-            sb.append("#### 🔴 Security Blockers:\n");
-            for (String alert : alerts) {
-                sb.append(String.format("- %s\n", alert));
-            }
-            sb.append("\n**Action Required**: Resolve security blockers prior to merging into target production branch.\n\n");
+    private String generateStructuredReviewReport(
+            String title, int score, String mergeRec, 
+            List<String> securityAlerts, List<String> qualityIssues, 
+            List<String> perfIssues, List<String> positiveObs) {
+        
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("### 📋 Executive Summary: **%s**\n\n", title));
+        sb.append(String.format("- **Overall Code Quality Score**: `%d / 100`\n", score));
+        sb.append(String.format("- **Merge Recommendation**: **%s**\n\n", mergeRec));
+
+        // 1. Security Findings
+        sb.append("### 🛡️ 1. Security Vulnerabilities (OWASP Top 10 Audit)\n");
+        if (securityAlerts.isEmpty()) {
+            sb.append("🟢 **No OWASP security vulnerabilities or credential leaks detected.**\n\n");
         } else {
-            sb.append("#### 🟢 Security Audit Passed:\nNo OWASP security vulnerabilities or credential leaks detected.\n\n");
+            for (String alert : securityAlerts) {
+                sb.append(String.format("%s\n\n", alert));
+            }
         }
 
-        sb.append("#### 💡 Quality Recommendations:\n");
-        for (String imp : improvements) {
-            sb.append(String.format("- %s\n", imp));
+        // 2. Code Quality Findings
+        sb.append("### 🧹 2. Code Quality & Maintainability Findings\n");
+        if (qualityIssues.isEmpty()) {
+            sb.append("🟢 **No code quality issues detected.**\n\n");
+        } else {
+            for (String issue : qualityIssues) {
+                sb.append(String.format("- %s\n", issue));
+            }
+            sb.append("\n");
+        }
+
+        // 3. Performance Findings
+        sb.append("### ⚡ 3. Performance Findings\n");
+        if (perfIssues.isEmpty()) {
+            sb.append("🟢 **No performance bottlenecks detected.**\n\n");
+        } else {
+            for (String perf : perfIssues) {
+                sb.append(String.format("- %s\n", perf));
+            }
+            sb.append("\n");
+        }
+
+        // 4. Positive Observations
+        sb.append("### ✨ 4. Positive Observations\n");
+        for (String pos : positiveObs) {
+            sb.append(String.format("- %s\n", pos));
+        }
+        sb.append("\n");
+
+        // 5. Prioritized Action Items
+        sb.append("### 📋 5. Prioritized Action Items\n");
+        if (!securityAlerts.isEmpty()) {
+            sb.append("1. **HIGH PRIORITY**: Resolve Security Blockers prior to merging into target branch.\n");
+        }
+        if (!qualityIssues.isEmpty()) {
+            sb.append("2. **MEDIUM PRIORITY**: Apply recommended code quality refactorings.\n");
+        }
+        if (securityAlerts.isEmpty() && qualityIssues.isEmpty()) {
+            sb.append("1. **READY FOR MERGE**: Code satisfies enterprise security and quality guidelines.\n");
         }
 
         return sb.toString();

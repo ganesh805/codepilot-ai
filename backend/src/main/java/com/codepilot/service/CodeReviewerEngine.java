@@ -53,23 +53,34 @@ public class CodeReviewerEngine {
             String trimmed = line.trim();
             if (trimmed.startsWith("+") && !trimmed.startsWith("+++")) {
                 String addedCode = trimmed.substring(1).trim();
+                String codeUpper = addedCode.toUpperCase();
 
-                // 1. Security Check: Hardcoded API Keys / Passwords
-                if (addedCode.matches("(?i).*password\\s*=\\s*[\"'].*[\"'].*") || addedCode.matches("(?i).*secret\\s*=\\s*[\"'].*[\"'].*")) {
-                    securityAlerts.add("🚨 HARDCODED SECRET DETECTED: Found hardcoded credentials in diff line: `" + addedCode + "`");
+                // 1. OWASP A02: Hardcoded Secrets & Credentials
+                if (codeUpper.contains("KEY =") || codeUpper.contains("SECRET =") || codeUpper.contains("PASSWORD =") 
+                        || codeUpper.contains("TOKEN =") || codeUpper.contains("AWS_") || codeUpper.contains("JWT_")) {
+                    if (addedCode.contains("\"") || addedCode.contains("'")) {
+                        securityAlerts.add("🚨 OWASP A02 HARDCODED SECRET: Hardcoded credential or API secret key detected in line: `" + addedCode + "`. Store credentials in Environment Variables or Secrets Manager!");
+                    }
                 }
 
-                // 2. Security Check: SQL Injection
-                if (addedCode.contains("executeQuery(") && addedCode.contains("+")) {
-                    securityAlerts.add("🚨 CRITICAL SQL INJECTION RISK: Dynamic String concatenation in SQL query: `" + addedCode + "`. Use JPA parameterized queries or PreparedStatement!");
+                // 2. OWASP A03: SQL Injection via Dynamic String Concatenation
+                if ((codeUpper.contains("SELECT ") || codeUpper.contains("UPDATE ") || codeUpper.contains("DELETE ")) && addedCode.contains("+")) {
+                    securityAlerts.add("🚨 OWASP A03 CRITICAL SQL INJECTION: Dynamic String concatenation detected in SQL query: `" + addedCode + "`. Use Parameterized PreparedStatement or JPA Named Parameters!");
+                } else if (addedCode.contains("executeQuery(") && addedCode.contains("+")) {
+                    securityAlerts.add("🚨 OWASP A03 SQL INJECTION RISK: Dynamic SQL execution: `" + addedCode + "`.");
                 }
 
-                // 3. Security Check: Insecure Cryptography MD5/DES
-                if (addedCode.contains("MessageDigest.getInstance(\"MD5\")") || addedCode.contains("Cipher.getInstance(\"DES\")")) {
-                    securityAlerts.add("⚠️ WEAK CRYPTOGRAPHY: Deprecated hashing algorithm MD5/DES detected. Use SHA-256 or BCrypt!");
+                // 3. OWASP A02: Insecure Cryptography (MD5 / DES)
+                if (codeUpper.contains("MD5") || codeUpper.contains("DES")) {
+                    securityAlerts.add("⚠️ OWASP A02 WEAK CRYPTOGRAPHY: Deprecated hashing/cipher algorithm (MD5/DES) detected in line: `" + addedCode + "`. Use SHA-256 or BCrypt!");
                 }
 
-                // 4. Quality Check: System.out.println
+                // 4. OWASP A05: Permissive CORS Configuration
+                if (addedCode.contains("@CrossOrigin(\"*\")") || addedCode.contains("allowedOrigins(\"*\")")) {
+                    securityAlerts.add("⚠️ OWASP A05 SECURITY MISCONFIGURATION: Permissive Wildcard CORS (`*`) detected. Restrict allowed origins to trusted domains!");
+                }
+
+                // 5. Code Quality Check: System.out.println / console.log
                 if (addedCode.contains("System.out.println") || addedCode.contains("console.log")) {
                     improvements.add("💡 LOGGING BEST PRACTICE: Replace raw `System.out.println`/`console.log` with SLF4J Logger (`log.info(...)`)");
                 }
@@ -81,7 +92,7 @@ public class CodeReviewerEngine {
         }
 
         int securityCount = securityAlerts.size();
-        int score = Math.max(0, 100 - (securityCount * 20) - (improvements.size() * 3));
+        int score = Math.max(0, 100 - (securityCount * 25) - (improvements.size() * 5));
 
         String summary = generateReviewSummary(prTitle, score, securityCount, securityAlerts, improvements);
 

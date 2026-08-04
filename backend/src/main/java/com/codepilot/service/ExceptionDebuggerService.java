@@ -23,7 +23,7 @@ public class ExceptionDebuggerService {
 
     private static final Logger log = LoggerFactory.getLogger(ExceptionDebuggerService.class);
 
-    private static final Pattern EXCEPTION_TYPE_PATTERN = Pattern.compile("([a-zA-Z0-9_.]+(?:Exception|Error|Failure)):?\\s*(.*)");
+    private static final Pattern EXCEPTION_TYPE_PATTERN = Pattern.compile("([a-zA-Z0-9_.]+(?:Exception|Error|Failure|Panic|CrashLoopBackOff|ImagePullBackOff)):?\\s*(.*)");
     private static final Pattern STACK_FRAME_PATTERN = Pattern.compile("at\\s+([a-zA-Z0-9_.$]+)\\.([a-zA-Z0-9_]+)\\(([^:]+):([0-9]+)\\)");
 
     private final ExceptionAnalysisRepository analysisRepository;
@@ -139,7 +139,7 @@ public class ExceptionDebuggerService {
                 .collect(Collectors.toList());
     }
 
-    // --- INTERNAL EXCEPTION KNOWLEDGE BASE & PARSERS ---
+    // --- UNIVERSAL MULTI-LANGUAGE KNOWLEDGE BASE & PARSERS ---
 
     private String extractDeepestCauseTrace(String input) {
         if (input.contains("Caused by:")) {
@@ -154,6 +154,7 @@ public class ExceptionDebuggerService {
         if (matcher.find()) {
             return matcher.group(1).trim();
         }
+        // Java & Spring
         if (input.contains("NoSuchBeanDefinitionException")) return "org.springframework.beans.factory.NoSuchBeanDefinitionException";
         if (input.contains("BeanCreationException")) return "org.springframework.beans.factory.BeanCreationException";
         if (input.contains("SQLNonTransientConnectionException") || input.contains("CommunicationsException")) return "java.sql.SQLNonTransientConnectionException";
@@ -165,7 +166,22 @@ public class ExceptionDebuggerService {
         if (input.contains("OutOfMemoryError")) return "java.lang.OutOfMemoryError";
         if (input.contains("StackOverflowError")) return "java.lang.StackOverflowError";
         if (input.contains("FileNotFoundException") || input.contains("NoSuchFileException")) return "java.io.FileNotFoundException";
-        return "java.lang.RuntimeException";
+        
+        // Python
+        if (input.contains("AttributeError")) return "AttributeError";
+        if (input.contains("KeyError")) return "KeyError";
+        if (input.contains("ModuleNotFoundError") || input.contains("ImportError")) return "ModuleNotFoundError";
+        
+        // Node.js & JS
+        if (input.contains("TypeError")) return "TypeError";
+        if (input.contains("ReferenceError")) return "ReferenceError";
+
+        // Docker / K8s
+        if (input.contains("CrashLoopBackOff")) return "Kubernetes CrashLoopBackOff";
+        if (input.contains("ImagePullBackOff")) return "Kubernetes ImagePullBackOff";
+        if (input.contains("Cannot connect to the Docker daemon")) return "DockerDaemonConnectionError";
+
+        return "RuntimeExecutionFailure";
     }
 
     private String extractErrorMessage(String input) {
@@ -200,7 +216,8 @@ public class ExceptionDebuggerService {
         String upper = (type + " " + input).toUpperCase();
         if (upper.contains("BEANCREATIONEXCEPTION") || upper.contains("NOSUCHBEANDEFINITIONEXCEPTION") 
                 || upper.contains("SQLNONTRANSIENTCONNECTIONEXCEPTION") || upper.contains("OUTOFMEMORYERROR") 
-                || upper.contains("STACKOVERFLOWERROR") || upper.contains("CONNECTION REFUSED") || upper.contains("ACCESS DENIED")) {
+                || upper.contains("STACKOVERFLOWERROR") || upper.contains("CRASHLOOPBACKOFF") 
+                || upper.contains("CONNECTION REFUSED") || upper.contains("ACCESS DENIED")) {
             return "Critical";
         }
         if (upper.contains("EXPIREDJWTEXCEPTION") || upper.contains("SIGNATUREEXCEPTION") 
@@ -208,7 +225,8 @@ public class ExceptionDebuggerService {
             return "High";
         }
         if (upper.contains("NULLPOINTEREXCEPTION") || upper.contains("ILLEGALARGUMENTEXCEPTION") 
-                || upper.contains("CONSTRAINTVIOLATIONEXCEPTION") || upper.contains("FILENOTFOUNDEXCEPTION")) {
+                || upper.contains("CONSTRAINTVIOLATIONEXCEPTION") || upper.contains("FILENOTFOUNDEXCEPTION")
+                || upper.contains("TYPEERROR") || upper.contains("KEYERROR") || upper.contains("ATTRIBUTEERROR")) {
             return "Medium";
         }
         return "Low";
@@ -218,7 +236,8 @@ public class ExceptionDebuggerService {
         String msgLower = msg.toLowerCase();
         if (msgLower.contains("access denied") || msgLower.contains("connection refused") 
                 || type.contains("ExpiredJwtException") || type.contains("NoSuchBeanDefinitionException")
-                || type.contains("SignatureException") || type.contains("OutOfMemoryError")) {
+                || type.contains("SignatureException") || type.contains("OutOfMemoryError")
+                || type.contains("CrashLoopBackOff") || type.contains("ImagePullBackOff")) {
             return new ConfidenceDiagnosis(100, "Exact exception type and error message signature extracted directly from exception payload.");
         }
         if (appLoc != null) {
@@ -229,7 +248,7 @@ public class ExceptionDebuggerService {
 
     private String computeFixTime(String type, String severity) {
         if (severity.equals("Critical")) return "10 - 15 mins";
-        if (type.contains("NullPointerException")) return "5 - 10 mins";
+        if (type.contains("NullPointerException") || type.contains("TypeError")) return "5 - 10 mins";
         return "10 - 20 mins";
     }
 
@@ -243,7 +262,7 @@ public class ExceptionDebuggerService {
         if (type.contains("BadSqlGrammarException")) {
             return "Database Query Failure! Invalid SQL statement executed, resulting in transaction rollback.";
         }
-        if (type.contains("NullPointerException")) {
+        if (type.contains("NullPointerException") || type.contains("TypeError")) {
             return "API HTTP 500 Server Error served to users during request execution.";
         }
         if (type.contains("ExpiredJwtException") || type.contains("SignatureException")) {
@@ -254,6 +273,9 @@ public class ExceptionDebuggerService {
         }
         if (type.contains("StackOverflowError")) {
             return "Thread Crash / StackOverflowError! Infinite recursion exceeded thread call stack size.";
+        }
+        if (type.contains("CrashLoopBackOff")) {
+            return "Kubernetes Pod Failure! Container continuously crashing upon startup.";
         }
         return "Operational Exception or Business Processing Error.";
     }
@@ -272,7 +294,7 @@ public class ExceptionDebuggerService {
         return list;
     }
 
-    // --- KNOWLEDGE BASE: POSSIBLE CAUSES ---
+    // --- UNIVERSAL KNOWLEDGE BASE: POSSIBLE CAUSES ---
     private Map<String, Integer> computePossibleCauses(String type, String msg, StackFrameAppLocation appLoc, String rawInput) {
         Map<String, Integer> map = new LinkedHashMap<>();
         String msgLower = msg.toLowerCase();
@@ -305,15 +327,19 @@ public class ExceptionDebuggerService {
             map.put("Java Heap Memory exhausted due to memory leak or unpaginated large dataset query", 100);
         } else if (type.contains("StackOverflowError")) {
             map.put("Infinite recursive method call without base termination condition", 100);
-        } else if (type.contains("FileNotFoundException")) {
-            map.put("File does not exist at specified path or application lacks read permissions", 100);
+        } else if (type.contains("CrashLoopBackOff")) {
+            map.put("Container entrypoint script exit code non-zero or missing environment variables", 100);
+        } else if (type.contains("TypeError")) {
+            map.put("Attempting to access property or invoke method on undefined/null object in JavaScript/TypeScript", 100);
+        } else if (type.contains("AttributeError")) {
+            map.put("Attempting to access non-existent attribute or method on Python object", 100);
         } else {
             map.put("Unhandled runtime execution boundary failure", 85);
         }
         return map;
     }
 
-    // --- KNOWLEDGE BASE: CHECKLIST ---
+    // --- UNIVERSAL KNOWLEDGE BASE: CHECKLIST ---
     private List<String> computeChecklist(String type, String msg) {
         List<String> list = new ArrayList<>();
         String msgLower = msg.toLowerCase();
@@ -341,17 +367,9 @@ public class ExceptionDebuggerService {
         } else if (type.contains("ExpiredJwtException")) {
             list.add("✔ Verify JWT token expiration duration setting (`exp` claim)");
             list.add("✔ Implement client-side refresh token flow");
-        } else if (type.contains("SignatureException")) {
-            list.add("✔ Verify `jwt.secret` configuration in application.properties matches auth server");
-        } else if (type.contains("OutOfMemoryError")) {
-            list.add("✔ Use pagination (`Pageable`) for large database queries");
-            list.add("✔ Analyze JVM Heap Dump using Eclipse MAT or VisualVM");
-        } else if (type.contains("StackOverflowError")) {
-            list.add("✔ Inspect call stack for repeating recursive method calls");
-            list.add("✔ Ensure recursive methods have valid base termination conditions");
-        } else if (type.contains("FileNotFoundException")) {
-            list.add("✔ Verify target file path exists");
-            list.add("✔ Check file read/write permissions for process user");
+        } else if (type.contains("CrashLoopBackOff")) {
+            list.add("✔ Inspect pod container logs using `kubectl logs <pod-name>`");
+            list.add("✔ Check container entrypoint command and environment variable secrets");
         } else {
             list.add("✔ Verify application configuration and method parameters");
         }
@@ -360,11 +378,13 @@ public class ExceptionDebuggerService {
 
     private List<String> computeTechnologies(String type, String input) {
         List<String> tech = new ArrayList<>();
-        tech.add("Java 21");
-        if (type.contains("Bean") || type.contains("NoSuchBean")) tech.add("Spring Boot 3.3");
+        if (input.contains("java.") || input.contains("org.springframework") || type.contains("Bean")) tech.add("Java 21 / Spring Boot 3.3");
+        if (input.contains("python") || type.contains("AttributeError") || type.contains("KeyError")) tech.add("Python 3.12");
+        if (input.contains("node_modules") || type.contains("TypeError") || input.contains("javascript")) tech.add("Node.js / TypeScript");
         if (input.contains("sql") || input.contains("jdbc") || type.contains("SQL") || type.contains("BadSql")) tech.add("MySQL / PostgreSQL");
-        if (input.contains("jpa") || input.contains("hibernate") || type.contains("ConstraintViolation")) tech.add("Spring Data JPA");
-        if (type.contains("Jwt") || type.contains("Signature")) tech.add("Spring Security & JWT");
+        if (input.contains("docker") || type.contains("DockerDaemon")) tech.add("Docker Container Engine");
+        if (type.contains("CrashLoopBackOff") || type.contains("ImagePullBackOff")) tech.add("Kubernetes Cluster Engine");
+        if (tech.isEmpty()) tech.add("Multi-Platform Runtime Environment");
         return tech;
     }
 
@@ -448,6 +468,9 @@ public class ExceptionDebuggerService {
         if (type.contains("FileNotFoundException")) {
             return String.format("FileNotFoundException: Cannot find target file (%s).", msg);
         }
+        if (type.contains("CrashLoopBackOff")) {
+            return "Kubernetes CrashLoopBackOff: Container application failed or exited with non-zero exit code.";
+        }
         return String.format("%s: %s", type, msg);
     }
 
@@ -489,8 +512,8 @@ public class ExceptionDebuggerService {
         if (type.contains("StackOverflowError")) {
             return "Evidence: Recursive call stack exhaustion. Remedy: Add a base termination condition to stop infinite recursion.";
         }
-        if (type.contains("FileNotFoundException")) {
-            return "Evidence: File path missing. Remedy: Check file path, file existence, and read permissions.";
+        if (type.contains("CrashLoopBackOff")) {
+            return "Evidence: Container crash exit code. Remedy: Check environment variables, application launcher config, and container entrypoint script.";
         }
         return "Evidence: Exception in stack trace. Remedy: Enclose execution in try-catch handling and log detailed error message.";
     }
@@ -609,17 +632,18 @@ public class ExceptionDebuggerService {
             String fix, String codeExample, List<String> checklist, List<String> tech, List<String> preventiveRecs, List<String> resources) {
 
         StringBuilder sb = new StringBuilder();
-        sb.append("# 🐞 Exception Diagnostic Report\n\n");
+        sb.append("# 🐞 Enterprise Diagnostic Report\n\n");
 
         sb.append("## 📊 Executive Summary\n");
         sb.append(String.format("- **Exception Type**: `%s`\n", type));
+        sb.append(String.format("- **Detected Technology**: `%s`\n", String.join(", ", tech)));
         sb.append(String.format("- **Severity**: `%s` | **Confidence Score**: `%d%%` (`%s`)\n", severity, confidence, confReason));
         sb.append(String.format("- **Root Cause Location**: `%s` (Line %s)\n", appLoc != null ? appLoc.file : "N/A", appLoc != null ? String.valueOf(appLoc.lineNumber) : "N/A"));
         sb.append(String.format("- **Estimated Fix Time**: `%s`\n", fixTime));
         sb.append(String.format("- **Production Impact**: %s\n\n", impact));
 
         sb.append("-----------------------------------\n");
-        sb.append("## 🔍 Root Cause Analysis\n\n");
+        sb.append("## 🔍 Root Cause Analysis (RCA)\n\n");
         sb.append(String.format("**Root Cause**: %s\n\n", rootCause));
 
         sb.append("-----------------------------------\n");

@@ -10,4 +10,6 @@ import java.util.List;
 public interface ExceptionAnalysisRepository extends JpaRepository<ExceptionAnalysis, Long> {
 
     List<ExceptionAnalysis> findByUserIdOrderByCreatedAtDesc(Long userId);
+
+    long countByUserId(Long userId);
 }

@@ -10,4 +10,6 @@ import java.util.List;
 public interface SqlOptimizationRepository extends JpaRepository<SqlOptimization, Long> {
 
     List<SqlOptimization> findByUserIdOrderByCreatedAtDesc(Long userId);
+
+    long countByUserId(Long userId);
 }

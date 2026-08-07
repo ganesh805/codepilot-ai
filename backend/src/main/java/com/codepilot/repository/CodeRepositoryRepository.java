@@ -15,4 +15,6 @@ public interface CodeRepositoryRepository extends JpaRepository<CodeRepository, 
     Optional<CodeRepository> findByUuidAndUserId(String uuid, Long userId);
 
     Optional<CodeRepository> findByUuid(String uuid);
+
+    long countByUserId(Long userId);
 }

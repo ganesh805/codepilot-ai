@@ -3,6 +3,7 @@ package com.codepilot.repository;
 import com.codepilot.entity.CodeChunk;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -13,6 +14,9 @@ public interface CodeChunkRepository extends JpaRepository<CodeChunk, Long> {
     List<CodeChunk> findByRepositoryIdOrderByFilePathAscChunkIndexAsc(Long repositoryId);
 
     long countByRepositoryId(Long repositoryId);
+
+    @Query("SELECT COUNT(c) FROM CodeChunk c WHERE c.repository.user.id = :userId")
+    long countByUserId(@Param("userId") Long userId);
 
     void deleteByRepositoryId(Long repositoryId);
 

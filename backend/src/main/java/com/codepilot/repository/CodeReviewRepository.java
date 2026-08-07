@@ -10,4 +10,6 @@ import java.util.List;
 public interface CodeReviewRepository extends JpaRepository<CodeReview, Long> {
 
     List<CodeReview> findByUserIdOrderByCreatedAtDesc(Long userId);
+
+    long countByUserId(Long userId);
 }

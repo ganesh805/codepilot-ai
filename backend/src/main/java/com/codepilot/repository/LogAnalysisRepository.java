@@ -10,4 +10,6 @@ import java.util.List;
 public interface LogAnalysisRepository extends JpaRepository<LogAnalysis, Long> {
 
     List<LogAnalysis> findByUserIdOrderByCreatedAtDesc(Long userId);
+
+    long countByUserId(Long userId);
 }

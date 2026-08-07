@@ -1,0 +1,187 @@
+<div class="optimizer-container">
+  <!-- Top Header & Hero -->
+  <div class="page-header">
+    <div class="header-title">
+      <h1>⚡ Universal AI Code Optimizer & Algorithm Engine</h1>
+      <p>Analyze code complexity, algorithm bottlenecks, data structures, and generate optimized code across 20+ languages.</p>
+    </div>
+    <div class="sample-pills">
+      <span class="pill-label">Try Samples:</span>
+      <button class="pill-btn" (click)="loadSample('dsa')">O(N²) Array Duplicates</button>
+      <button class="pill-btn" (click)="loadSample('python_dp')">Python Recursion O(2ⁿ)</button>
+      <button class="pill-btn" (click)="loadSample('sql')">SQL Query Optimization</button>
+      <button class="pill-btn" (click)="loadSample('string_builder')">Java StringBuilder</button>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <!-- Left Column: Input Form & History -->
+    <div class="input-panel">
+      <mat-card class="editor-card">
+        <div class="card-header">
+          <div class="lang-selector">
+            <label>Language:</label>
+            <select [(ngModel)]="selectedLanguage">
+              <option *ngFor="let lang of languages" [value]="lang">{{ lang }}</option>
+            </select>
+          </div>
+          <span class="hint-text">Paste method, algorithm, DSA problem, or full source file</span>
+        </div>
+
+        <textarea 
+          class="code-textarea" 
+          [(ngModel)]="inputCode" 
+          placeholder="Paste your source code, SQL query, or algorithm here..."
+          rows="14">
+        </textarea>
+
+        <div class="card-actions">
+          <button class="btn-primary" (click)="runOptimization()" [disabled]="analyzing || !inputCode.trim()">
+            <span *ngIf="!analyzing">⚡ Run AI Optimization & Algorithm Analysis</span>
+            <span *ngIf="analyzing">
+              <mat-spinner diameter="18" style="display:inline-block; vertical-align:middle; margin-right:8px;"></mat-spinner>
+              Analyzing Complexity & Data Structures...
+            </span>
+          </button>
+        </div>
+      </mat-card>
+
+      <!-- History Panel -->
+      <mat-card class="history-card" *ngIf="history.length > 0">
+        <h3>📜 Optimization History</h3>
+        <div class="history-list">
+          <div 
+            class="history-item" 
+            *ngFor="let item of history" 
+            (click)="selectHistory(item)"
+            [class.active]="currentResponse?.uuid === item.uuid">
+            <div class="history-meta">
+              <span class="lang-badge">{{ item.detectedLanguage }}</span>
+              <span class="level-badge">{{ item.optimizationLevel }}</span>
+            </div>
+            <div class="history-complexity">
+              Before: <code>{{ item.timeComplexityBefore }}</code> ➔ After: <code>{{ item.timeComplexityAfter }}</code>
+            </div>
+            <div class="history-time">{{ item.createdAt | date:'short' }}</div>
+          </div>
+        </div>
+      </mat-card>
+    </div>
+
+    <!-- Right Column: Results & Diagnostic Report -->
+    <div class="results-panel">
+      <div *ngIf="!currentResponse && !analyzing" class="empty-state">
+        <div class="empty-icon">⚡</div>
+        <h3>No Code Analyzed Yet</h3>
+        <p>Paste any code snippet on the left and click <strong>Run AI Optimization</strong> to generate time/space complexity analysis and optimized code.</p>
+      </div>
+
+      <div *ngIf="analyzing" class="loading-state">
+        <mat-spinner diameter="44"></mat-spinner>
+        <h4>Performing Complexity Analysis...</h4>
+        <p>Evaluating data structures, algorithm bottlenecks, and theoretical execution bounds.</p>
+      </div>
+
+      <!-- Main Results Display -->
+      <div *ngIf="currentResponse && !analyzing" class="report-content">
+        <!-- Top Metrics Banner -->
+        <mat-card class="summary-banner" [class.optimal-banner]="currentResponse.isAlreadyOptimal">
+          <div class="banner-badge">
+            <span class="conf-badge">Confidence: {{ currentResponse.optimizationConfidence }}</span>
+            <span class="level-badge-large">{{ currentResponse.optimizationLevel }}</span>
+          </div>
+
+          <div class="banner-title" *ngIf="currentResponse.isAlreadyOptimal">
+            <h2>✅ Implementation is Already Optimal</h2>
+            <p>Current code uses efficient data structures ($O(N)$ lookup) with no critical algorithmic bottlenecks.</p>
+          </div>
+
+          <div class="banner-title" *ngIf="!currentResponse.isAlreadyOptimal">
+            <h2>🚀 {{ currentResponse.theoreticalImprovement }}</h2>
+            <p>Detected Language: <strong>{{ currentResponse.detectedLanguage }}</strong> ({{ currentResponse.detectedFramework }})</p>
+          </div>
+
+          <!-- Complexity Matrix Table -->
+          <div class="matrix-grid">
+            <div class="matrix-box">
+              <span class="matrix-label">Time Complexity</span>
+              <div class="matrix-values">
+                <span class="before-val">Before: {{ currentResponse.timeComplexityBefore }}</span>
+                <span class="arrow">➔</span>
+                <span class="after-val">After: {{ currentResponse.timeComplexityAfter }}</span>
+              </div>
+            </div>
+
+            <div class="matrix-box">
+              <span class="matrix-label">Space Complexity</span>
+              <div class="matrix-values">
+                <span class="before-val">Before: {{ currentResponse.spaceComplexityBefore }}</span>
+                <span class="arrow">➔</span>
+                <span class="after-val">After: {{ currentResponse.spaceComplexityAfter }}</span>
+              </div>
+            </div>
+          </div>
+        </mat-card>
+
+        <!-- Navigation Tabs -->
+        <div class="nav-tabs">
+          <button [class.active]="activeTab === 'report'" (click)="activeTab = 'report'">📄 Full RCA Report</button>
+          <button [class.active]="activeTab === 'code'" (click)="activeTab = 'code'">💻 Optimized Code</button>
+          <button [class.active]="activeTab === 'complexity'" (click)="activeTab = 'complexity'">📊 Complexity Details</button>
+        </div>
+
+        <!-- Tab 1: Full RCA Markdown Report -->
+        <mat-card class="tab-card" *ngIf="activeTab === 'report'">
+          <div class="markdown-view">
+            <pre class="report-pre">{{ currentResponse.fullReportMarkdown }}</pre>
+          </div>
+        </mat-card>
+
+        <!-- Tab 2: Side-by-Side Code Comparison -->
+        <mat-card class="tab-card" *ngIf="activeTab === 'code'">
+          <div class="code-actions-bar">
+            <span>Optimized Code ({{ currentResponse.detectedLanguage }})</span>
+            <button class="copy-btn" (click)="copyOptimizedCode()">
+              {{ copied ? '✓ Copied!' : '📋 Copy Optimized Code' }}
+            </button>
+          </div>
+
+          <div class="code-comparison-grid">
+            <div class="code-block original-block">
+              <div class="block-header">Original Code</div>
+              <pre><code>{{ currentResponse.rawCode }}</code></pre>
+            </div>
+
+            <div class="code-block optimized-block">
+              <div class="block-header">Optimized Code</div>
+              <pre><code>{{ currentResponse.optimizedCode }}</code></pre>
+            </div>
+          </div>
+        </mat-card>
+
+        <!-- Tab 3: Detailed Complexity & Trade-offs -->
+        <mat-card class="tab-card" *ngIf="activeTab === 'complexity'">
+          <div class="details-section">
+            <h3>🔍 Identified Bottlenecks</h3>
+            <ul>
+              <li *ngFor="let b of currentResponse.bottlenecks">{{ b }}</li>
+            </ul>
+
+            <h3>💡 Why It Is Better</h3>
+            <p>{{ currentResponse.whyBetter }}</p>
+
+            <h3>⚖️ Trade-offs & Limitations</h3>
+            <p>{{ currentResponse.tradeOffs }}</p>
+
+            <h3>🚫 When NOT to Use</h3>
+            <p>{{ currentResponse.whenNotToUse }}</p>
+
+            <h3>✓ Verification & Correctness Notes</h3>
+            <p>{{ currentResponse.correctnessNotes }}</p>
+          </div>
+        </mat-card>
+
+      </div>
+    </div>
+  </div>
+</div>

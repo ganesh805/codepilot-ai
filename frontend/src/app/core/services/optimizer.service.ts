@@ -8,7 +8,7 @@ import { CodeOptimizerRequest, CodeOptimizerResponse } from '../models/optimizer
 })
 export class OptimizerService {
   private http = inject(HttpClient);
-  private apiUrl = '/api/v1/optimizer';
+  private apiUrl = 'http://localhost:8080/api/v1/optimizer';
 
   optimizeCode(request: CodeOptimizerRequest): Observable<CodeOptimizerResponse> {
     return this.http.post<CodeOptimizerResponse>(`${this.apiUrl}/analyze`, request);

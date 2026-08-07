@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS code_optimizations (
     user_id BIGINT NOT NULL,
     repository_id BIGINT,
     language VARCHAR(50) NOT NULL,
-    optimization_level VARCHAR(255) NOT NULL,
+    optimization_level VARCHAR(50) NOT NULL,
     raw_code LONGTEXT NOT NULL,
     optimized_code LONGTEXT NOT NULL,
     time_complexity_before VARCHAR(100),

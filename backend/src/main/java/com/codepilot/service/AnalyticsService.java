@@ -43,18 +43,29 @@ public class AnalyticsService {
     }
 
     @Transactional(readOnly = true)
-    public AnalyticsMetricsDTO getUserAnalytics(User user) {
-        boolean isAdmin = user != null && user.getRoles() != null && user.getRoles().stream()
+    public AnalyticsMetricsDTO getUserAnalyticsByUsername(String username) {
+        if (username == null || username.trim().isEmpty()) {
+            return getEmptyAnalytics();
+        }
+
+        User user = userRepository.findByUsername(username)
+                .orElseGet(() -> userRepository.findByEmail(username).orElse(null));
+
+        if (user == null) {
+            return getEmptyAnalytics();
+        }
+
+        boolean isAdmin = user.getRoles() != null && user.getRoles().stream()
                 .anyMatch(r -> r.getName() != null && r.getName().name().equals("ROLE_ADMIN"));
 
-        long repos = (isAdmin || user == null) ? repoRepository.count() : repoRepository.countByUserId(user.getId());
-        long chunks = (isAdmin || user == null) ? chunkRepository.count() : chunkRepository.countByUserId(user.getId());
-        long embeddings = (isAdmin || user == null) ? embeddingRepository.count() : embeddingRepository.countByUserId(user.getId());
-        long exceptions = (isAdmin || user == null) ? exceptionRepository.count() : exceptionRepository.countByUserId(user.getId());
-        long logs = (isAdmin || user == null) ? logRepository.count() : logRepository.countByUserId(user.getId());
-        long reviews = (isAdmin || user == null) ? reviewRepository.count() : reviewRepository.countByUserId(user.getId());
-        long docs = (isAdmin || user == null) ? apiDocRepository.count() : apiDocRepository.countByUserId(user.getId());
-        long sqls = (isAdmin || user == null) ? sqlRepository.count() : sqlRepository.countByUserId(user.getId());
+        long repos = isAdmin ? repoRepository.count() : repoRepository.countByUserId(user.getId());
+        long chunks = isAdmin ? chunkRepository.count() : chunkRepository.countByUserId(user.getId());
+        long embeddings = isAdmin ? embeddingRepository.count() : embeddingRepository.countByUserId(user.getId());
+        long exceptions = isAdmin ? exceptionRepository.count() : exceptionRepository.countByUserId(user.getId());
+        long logs = isAdmin ? logRepository.count() : logRepository.countByUserId(user.getId());
+        long reviews = isAdmin ? reviewRepository.count() : reviewRepository.countByUserId(user.getId());
+        long docs = isAdmin ? apiDocRepository.count() : apiDocRepository.countByUserId(user.getId());
+        long sqls = isAdmin ? sqlRepository.count() : sqlRepository.countByUserId(user.getId());
 
         return AnalyticsMetricsDTO.builder()
                 .totalUsers(userRepository.count())
@@ -67,6 +78,25 @@ public class AnalyticsService {
                 .totalCodeReviews(reviews)
                 .totalApiDocs(docs)
                 .totalSqlOptimizations(sqls)
+                .systemStatus("HEALTHY - ALL SYSTEMS OPERATIONAL")
+                .javaVersion(System.getProperty("java.version"))
+                .springVersion("3.3.4")
+                .serverTime(LocalDateTime.now())
+                .build();
+    }
+
+    private AnalyticsMetricsDTO getEmptyAnalytics() {
+        return AnalyticsMetricsDTO.builder()
+                .totalUsers(userRepository.count())
+                .totalRepositories(0)
+                .totalCodeChunks(0)
+                .totalEmbeddings(0)
+                .totalAiChats(0)
+                .totalExceptionAnalyses(0)
+                .totalLogAnalyses(0)
+                .totalCodeReviews(0)
+                .totalApiDocs(0)
+                .totalSqlOptimizations(0)
                 .systemStatus("HEALTHY - ALL SYSTEMS OPERATIONAL")
                 .javaVersion(System.getProperty("java.version"))
                 .springVersion("3.3.4")

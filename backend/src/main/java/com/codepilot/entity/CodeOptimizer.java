@@ -34,7 +34,7 @@ public class CodeOptimizer {
     @Column(name = "language", nullable = false, length = 50)
     private String language;
 
-    @Column(name = "optimization_level", nullable = false, length = 50)
+    @Column(name = "optimization_level", nullable = false, length = 255)
     private String optimizationLevel;
 
     @Column(name = "raw_code", nullable = false, columnDefinition = "LONGTEXT")
